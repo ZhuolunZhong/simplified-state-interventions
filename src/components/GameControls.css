@@ -1,0 +1,271 @@
+/* src/components/GameControls.css */
+.game-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 12px;
+  border: 1px solid #e1e8ed;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-width: 400px;
+}
+
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.control-section h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 0.5rem;
+}
+
+.control-section h4 {
+  margin: 0;
+  color: #34495e;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.control-button {
+  flex: 1;
+  min-width: 80px;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.control-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.control-button:active {
+  transform: translateY(0);
+}
+
+.control-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.start-button {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  color: white;
+}
+
+.resume-button {
+  background: linear-gradient(135deg, #f39c12, #f1c40f);
+  color: white;
+}
+
+.pause-button {
+  background: linear-gradient(135deg, #e74c3c, #e67e22);
+  color: white;
+}
+
+.step-button {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+}
+
+.step-button:not(:disabled):hover {
+  background: linear-gradient(135deg, #2980b9, #1f618d);
+}
+
+.reset-button {
+  background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+  color: white;
+}
+
+.reset-button:hover {
+  background: linear-gradient(135deg, #7f8c8d, #636e72);
+}
+
+.rule-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rule-select {
+  padding: 0.75rem;
+  border: 2px solid #bdc3c7;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.rule-select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.rule-description {
+  font-size: 0.8rem;
+  color: #7f8c8d;
+  font-style: italic;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 4px;
+  border-left: 3px solid #3498db;
+}
+
+.rule-quick-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.rule-quick-button {
+  padding: 0.5rem 0.75rem;
+  border: 2px solid #bdc3c7;
+  border-radius: 6px;
+  background: white;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.rule-quick-button:hover {
+  border-color: #3498db;
+  background: #ecf0f1;
+}
+
+.rule-quick-button.active {
+  border-color: #e74c3c;
+  background: #e74c3c;
+  color: white;
+  font-weight: 500;
+}
+
+.status-indicators {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+}
+
+.status-label {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.status-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.status-running {
+  color: #27ae60;
+}
+
+.status-paused {
+  color: #f39c12;
+}
+
+.status-stopped {
+  color: #e74c3c;
+}
+
+.rule-indicator {
+  color: #3498db;
+}
+
+.hints {
+  background: rgba(255, 255, 255, 0.5);
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #3498db;
+}
+
+.hints-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.8rem;
+  color: #5d6d7e;
+}
+
+.hints-list li {
+  margin-bottom: 0.3rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .game-controls {
+    padding: 1rem;
+    gap: 1rem;
+  }
+  
+  .control-buttons {
+    flex-direction: column;
+  }
+  
+  .rule-quick-buttons {
+    grid-template-columns: 1fr;
+  }
+  
+  .control-button {
+    min-width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .game-controls {
+    max-width: 100%;
+  }
+  
+  .status-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}
+
+.control-button:focus {
+  outline: 2px solid #2196f3;
+  outline-offset: 2px;
+}
+
+.control-button:active {
+  transform: scale(0.95);
+}
+
+.hints-list strong {
+  color: #2196f3;
+  font-weight: 600;
+}

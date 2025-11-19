@@ -1,0 +1,136 @@
+/* src/pages/IntroductionPage.css */
+.introduction-page {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.intro-content {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 3rem;
+  max-width: 800px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-align: center;
+}
+
+.intro-content h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1.5rem;
+}
+
+.intro-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin: 2.5rem 0;
+  text-align: left;
+}
+
+.intro-section {
+  background: rgba(255, 255, 255, 0.6);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
+}
+
+.intro-section h2 {
+  color: #2c3e50;
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.intro-section p {
+  color: #4b5563;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.intro-section ul, .intro-section ol {
+  color: #4b5563;
+  line-height: 1.6;
+  padding-left: 1.2rem;
+}
+
+.intro-section li {
+  margin-bottom: 0.5rem;
+}
+
+.intro-section strong {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.start-button {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 1rem 2.5rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.start-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 35px rgba(16, 185, 129, 0.4);
+}
+
+.start-button:active {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .introduction-page {
+    padding: 1rem;
+  }
+  
+  .intro-content {
+    padding: 2rem 1.5rem;
+  }
+  
+  .intro-content h1 {
+    font-size: 2rem;
+  }
+  
+  .intro-section {
+    padding: 1rem;
+  }
+  
+  .intro-section h2 {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .intro-content h1 {
+    font-size: 1.7rem;
+  }
+  
+  .start-button {
+    width: 100%;
+    justify-content: center;
+    padding: 0.875rem 2rem;
+    font-size: 1.1rem;
+  }
+}
