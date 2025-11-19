@@ -92,3 +92,28 @@ export const getMapDimensions = (mapDesc: MapDesc) => {
     ncol: mapDesc[0].length
   };
 };
+
+/**
+ * 获取地图的起点状态
+ */
+export const getStartState = (mapDesc: MapDesc): number => {
+  const ncol = mapDesc[0].length;
+  for (let row = 0; row < mapDesc.length; row++) {
+    for (let col = 0; col < ncol; col++) {
+      if (mapDesc[row][col] === 'S') {
+        return row * ncol + col;
+      }
+    }
+  }
+  return 0; // 默认回退到状态0
+};
+
+/**
+ * 检查状态是否是起点
+ */
+export const isStartState = (state: number, mapDesc: MapDesc): boolean => {
+  const ncol = mapDesc[0].length;
+  const row = Math.floor(state / ncol);
+  const col = state % ncol;
+  return mapDesc[row][col] === 'S';
+};

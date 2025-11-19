@@ -5,24 +5,40 @@ export const suggestionRule: InterventionFunction = (
   qtable: QTable,
   params: InterventionParams
 ): QTable => {
-  const { state, reward, newState, learningRate } = params;
+  const { state, reward, newState, learningRate, nrow, ncol } = params;
   
   const updatedQTable = qtable.map(row => [...row]);
   
-  const ncol = Math.sqrt(qtable.length); 
   const oldPos = { row: Math.floor(state / ncol), col: state % ncol };
   const newPos = { row: Math.floor(newState / ncol), col: newState % ncol };
   
   let actionToUpdate: Action;
-  if (newPos.col > oldPos.col) actionToUpdate = 2; // right
-  else if (newPos.col < oldPos.col) actionToUpdate = 0; // left
-  else if (newPos.row > oldPos.row) actionToUpdate = 1; // down
-  else actionToUpdate = 3; // up
+
+  const isOneDimensional = nrow === 1;
+  
+  if (isOneDimensional) {
+    // One-dimensional map: only consider horizontal movement
+    const colDiff = newPos.col - oldPos.col;
+    actionToUpdate = colDiff > 0 ? 2 : 0; // Right : Left
+    console.log(`1D Map: State ${state}->${newState}, ColDiff: ${colDiff}, Action: ${actionToUpdate}`);
+  } else {
+    // Multi-dimensional map: consider both horizontal and vertical movement
+    const rowDiff = newPos.row - oldPos.row;
+    const colDiff = newPos.col - oldPos.col;
+    
+    // Prioritize the direction with larger absolute difference
+    if (Math.abs(colDiff) > Math.abs(rowDiff)) {
+      actionToUpdate = colDiff > 0 ? 2 : 0; // Right : Left
+    } else {
+      actionToUpdate = rowDiff > 0 ? 1 : 3; // Down : Up
+    }
+    console.log(`2D Map: State ${state}->${newState}, RowDiff: ${rowDiff}, ColDiff: ${colDiff}, Action: ${actionToUpdate}`);
+  }
   
   const currentQ = updatedQTable[state][actionToUpdate];
   const maxNextQ = Math.max(...updatedQTable[newState]);
   const newQValue = currentQ + learningRate * (
-    reward + maxNextQ - currentQ
+    1 + maxNextQ - currentQ
   );
   
   updatedQTable[state][actionToUpdate] = newQValue;

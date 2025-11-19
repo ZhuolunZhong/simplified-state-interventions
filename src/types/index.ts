@@ -33,6 +33,8 @@ export interface LearningParams {
   epsilon: number;
   stateSize: number;
   actionSize: number;
+  nrow: number; 
+  ncol: number; 
 }
 
 // ==================== Intervention System Types ====================
@@ -49,6 +51,8 @@ export interface InterventionParams {
   action: number;
   learningRate: number;
   gamma: number; 
+  nrow: number; 
+  ncol: number; 
 }
 
 export type InterventionFunction = (
@@ -263,14 +267,6 @@ export const INTERVENTION_RULES: InterventionRule[] = [
   'interrupt',
   'impede'
 ];
-
-export const DEFAULT_LEARNING_PARAMS: LearningParams = {
-  learningRate: 0.8,
-  gamma: 0.95,  // Ensure consistency with Python version
-  epsilon: 0.1,
-  stateSize: 16,
-  actionSize: 2
-};
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   mapDesc: ['SFFF', 'FHFH', 'FFFG'],

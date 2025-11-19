@@ -21,7 +21,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   // Game configuration
   const [gameConfig] = useState(() => ({
     ...DEFAULT_GAME_CONFIG,
-    mapDesc: MAP_CONFIGS.STANDARD_4x4
+    mapDesc: MAP_CONFIGS.LINEAR_1x16
   }));
 
   const [activeInfoTab, setActiveInfoTab] = useState<'status' | 'qtable'>('status');
@@ -116,6 +116,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     chooseAction,
     learningRate: learningParams.learningRate,
     gamma: learningParams.gamma,
+    learningParams: learningParams,
     onInterventionApplied: handleInterventionApplied
   });
 

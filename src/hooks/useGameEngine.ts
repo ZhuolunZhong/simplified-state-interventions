@@ -1,5 +1,6 @@
 // src/hooks/useGameEngine.ts
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { getStartState } from '../services/gameConfig';
 import { 
   AgentState, 
   GameStatus, 
@@ -20,8 +21,11 @@ export const useGameEngine = ({
   onIntervention 
 }: UseGameEngineProps) => {
   // ==================== State Definitions ====================
+  // Calculate start state from map description
+  const startState = getStartState(config.mapDesc); 
+
   const [agentState, setAgentState] = useState<AgentState>({
-    currentState: 0,
+    currentState: startState, 
     totalReward: 0,
     steps: 0,
     lastReward: 0,
@@ -170,9 +174,9 @@ export const useGameEngine = ({
       gameLoopRef.current = null;
     }
 
-    // Reset state
+    // Reset state - use actual start state from map
     setAgentState({
-      currentState: 0,
+      currentState: startState, 
       totalReward: 0,
       steps: 0,
       lastReward: 0,
@@ -197,7 +201,7 @@ export const useGameEngine = ({
     successCountRef.current = 0;
 
     lastStepTimeRef.current = 0;
-  }, []);
+  }, [startState]); 
 
   /**
    * Single step execution
@@ -306,11 +310,11 @@ export const useGameEngine = ({
         return newStats;
       });
 
-      // Auto reset
+      // Auto reset - use actual start state
       if (currentGameStatus.isRunning && !currentGameStatus.isPaused) { 
         setTimeout(() => {
           setAgentState({
-            currentState: 0,
+            currentState: startState, 
             totalReward: 0,
             steps: 0,
             lastReward: 0,
@@ -324,7 +328,10 @@ export const useGameEngine = ({
         }, 1000);
       }
     }
-  }, [config.mapDesc, calculateReward, isTerminalState, chooseAction, updateQValue, onStep, onEpisodeEnd, getAgentPosition]); 
+  }, [
+    config.mapDesc, calculateReward, isTerminalState, chooseAction, updateQValue, 
+    onStep, onEpisodeEnd, getAgentPosition, startState 
+  ]); 
 
   /**
    * Set agent state (for intervention)
@@ -419,11 +426,11 @@ export const useGameEngine = ({
           isPaused: true
         }));
 
-        // Delay episode reset
+        // Delay episode reset - use actual start state
         setTimeout(() => {
           console.log('🔄 Auto reset episode');
           setAgentState({
-            currentState: 0,
+            currentState: startState, 
             totalReward: 0,
             steps: 0,
             lastReward: reward, 
@@ -456,7 +463,7 @@ export const useGameEngine = ({
   }, [
     agentState.currentState, gameStatus.isIntervening, gameStatus.isRunning, gameStatus.isTraining,
     calculateReward, isTerminalState, applyIntervention, onIntervention, onEpisodeEnd,
-    getAgentPosition, config.mapDesc, gameStats.episode
+    getAgentPosition, config.mapDesc, gameStats.episode, startState 
   ]);
 
   // ==================== Game Main Loop ====================

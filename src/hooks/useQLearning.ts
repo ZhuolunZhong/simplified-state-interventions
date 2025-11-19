@@ -1,5 +1,5 @@
 // src/hooks/useQLearning.ts
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { 
   QTable, 
   LearningParams, 
@@ -8,35 +8,71 @@ import {
   Position
 } from '../types';
 
-// ==================== Default Parameters ====================
-const DEFAULT_LEARNING_PARAMS: LearningParams = {
-  learningRate: 0.8,
-  gamma: 0.95,
-  epsilon: 0.1,
-  stateSize: 16,
-  actionSize: 4
-};
-
 export const useQLearning = ({ 
   initialState,
   initialParams,
   mapDesc, 
   onQTableUpdate 
 }: UseQLearningProps = {}) => {
+  // ==================== Calculated Parameters ====================
+  /**
+   * Calculate learning parameters based on map description
+   * This replaces the static DEFAULT_LEARNING_PARAMS
+   */
+  const calculatedParams = useMemo((): LearningParams => {
+    // Base parameters from initialParams or defaults
+    const baseParams = {
+      learningRate: 0.8,
+      gamma: 0.95,
+      epsilon: 0.1,
+      stateSize: 16,      // Will be overridden if mapDesc is provided
+      actionSize: 4,
+      nrow: 4,            // Will be overridden if mapDesc is provided  
+      ncol: 4             // Will be overridden if mapDesc is provided
+    };
+
+    // Apply user-provided initial parameters
+    Object.assign(baseParams, initialParams);
+
+    // 🎯 KEY CHANGE: Calculate dimensions from map description if available
+    if (mapDesc && mapDesc.length > 0 && mapDesc[0].length > 0) {
+      const nrow = mapDesc.length;
+      const ncol = mapDesc[0].length;
+      const stateSize = nrow * ncol;
+      
+      return {
+        ...baseParams,
+        stateSize,    
+        nrow,        
+        ncol,        
+        actionSize: 4 
+      };
+    }
+
+    // Fallback: assume square map if no mapDesc provided
+    console.warn('No map description provided, assuming square map');
+    const stateSize = baseParams.stateSize;
+    const dimension = Math.sqrt(stateSize);
+    
+    return {
+      ...baseParams,
+      nrow: dimension,    
+      ncol: dimension     
+    };
+  }, [initialParams, mapDesc]);
+
   // ==================== State Definitions ====================
   const [qtable, setQTable] = useState<QTable>(() => {
     if (initialState) return initialState;
     
-    const params = { ...DEFAULT_LEARNING_PARAMS, ...initialParams };
-    return Array.from({ length: params.stateSize }, () => 
-      Array.from({ length: params.actionSize }, () => 0)
+    // 🎯 KEY CHANGE: Use calculated parameters for initial Q-table
+    const { stateSize, actionSize } = calculatedParams;
+    return Array.from({ length: stateSize }, () => 
+      Array.from({ length: actionSize }, () => 0)
     );
   });
 
-  const [learningParams, setLearningParams] = useState<LearningParams>(() => ({
-    ...DEFAULT_LEARNING_PARAMS,
-    ...initialParams
-  }));
+  const [learningParams, setLearningParams] = useState<LearningParams>(calculatedParams);
 
   // ==================== Ref Definitions ====================
   class SimpleRNG {
@@ -62,20 +98,16 @@ export const useQLearning = ({
 
   // ==================== Utility Functions ====================
   /**
-   * Get available actions for a state
+   * Get available actions for a state using actual map dimensions
    */
   const getAvailableActions = useCallback((state: number): Action[] => {
-    if (!mapDesc) {
-      return [0, 1, 2, 3];
-    }
-
-    const ncol = mapDesc[0].length;
-    const nrow = mapDesc.length;
+    const { nrow, ncol } = learningParams;
     const row = Math.floor(state / ncol);
     const col = state % ncol;
     
     const availableActions: Action[] = [];
     
+    // 🎯 KEY CHANGE: Use actual map dimensions from learningParams
     // Check if each direction is available (not out of bounds)
     if (col > 0) availableActions.push(0); // Left
     if (row < nrow - 1) availableActions.push(1); // Down
@@ -83,7 +115,7 @@ export const useQLearning = ({
     if (row > 0) availableActions.push(3); // Up
     
     return availableActions;
-  }, [mapDesc]);
+  }, [learningParams]); 
 
   /**
    * Select best action from available actions
@@ -131,7 +163,7 @@ export const useQLearning = ({
 
     // Exploitation: select action with maximum Q-value from available actions
     return getBestActionFromAvailable(state, availableActions);
-  }, [qtable, learningParams, getAvailableActions, getBestActionFromAvailable]);
+  }, [learningParams, getAvailableActions, getBestActionFromAvailable]);
 
   /**
    * Update Q-value - Q-learning core update formula
@@ -170,7 +202,7 @@ export const useQLearning = ({
   }, [onQTableUpdate]);
 
   /**
-   * Reset Q-table
+   * Reset Q-table using current learning parameters
    */
   const resetQTable = useCallback(() => {
     const { stateSize, actionSize } = learningParams;
@@ -184,7 +216,7 @@ export const useQLearning = ({
 
   // ==================== Parameter Management ====================
   /**
-   * Update learning parameters
+   * Update learning parameters with dimension validation
    */
   const updateLearningParams = useCallback((newParams: Partial<LearningParams>) => {
     setLearningParams(prev => {
@@ -274,7 +306,7 @@ export const useQLearning = ({
   }, []);
 
   /**
-   * Get visualization direction map for entire Q-table
+   * Get visualization direction map for entire Q-table using actual map dimensions
    */
   const getQTableDirections = useCallback((mapDescForViz: string[]): string[][] => {
     const nrow = mapDescForViz.length;

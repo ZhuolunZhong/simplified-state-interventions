@@ -16,8 +16,9 @@ export const useIntervention = ({
   chooseAction,
   learningRate,
   gamma,
-  onInterventionApplied
-}: UseInterventionProps) => {
+  onInterventionApplied,
+  learningParams 
+}: UseInterventionProps & { learningParams: any }) => { 
   // ==================== State Definitions ====================
   const [interventionRule, setInterventionRule] = useState<InterventionRule>('suggestion');
   const [interventionHistory, setInterventionHistory] = useState<InterventionRecord[]>([]);
@@ -33,7 +34,7 @@ export const useIntervention = ({
 
   // ==================== Core Intervention Functions ====================
   /**
-   * Apply intervention rule
+   * Apply intervention rule with correct map dimensions
    */
   const applyIntervention = useCallback((
     fromState: number, 
@@ -63,7 +64,6 @@ export const useIntervention = ({
       // Get the action the agent originally intended to take
       const intendedAction = chooseAction(fromState);
       
-      // Build intervention parameters
       const interventionParams: InterventionParams = {
         state: fromState,
         reward,
@@ -71,8 +71,19 @@ export const useIntervention = ({
         action: intendedAction,
         learningRate,
         gamma,
+        nrow: learningParams.nrow, 
+        ncol: learningParams.ncol, 
         ...additionalParams
       };
+
+      console.log(`Intervention params:`, {
+        fromState,
+        toState,
+        nrow: learningParams.nrow,
+        ncol: learningParams.ncol,
+        intendedAction,
+        rule: interventionRule
+      });
 
       // Apply intervention rule
       const newQTable = applyInterventionRule(
@@ -107,7 +118,8 @@ export const useIntervention = ({
         toState,
         reward,
         intendedAction,
-        learningRate
+        learningRate,
+        mapDimensions: `${learningParams.nrow}×${learningParams.ncol}` 
       });
 
     } catch (error) {
@@ -124,6 +136,8 @@ export const useIntervention = ({
     chooseAction,
     learningRate,
     gamma,
+    learningParams.nrow, 
+    learningParams.ncol, 
     updateQTable,
     onInterventionApplied
   ]);
@@ -166,9 +180,10 @@ export const useIntervention = ({
       byRule,
       byRulePercentage,
       lastIntervention,
-      averageReward
+      averageReward,
+      mapDimensions: `${learningParams.nrow}×${learningParams.ncol}` 
     };
-  }, [interventionHistory]);
+  }, [interventionHistory, learningParams.nrow, learningParams.ncol]); 
 
   /**
    * Get recent intervention records
@@ -194,12 +209,13 @@ export const useIntervention = ({
       metadata: {
         exportTime: new Date().toISOString(),
         totalInterventions: stats.total,
-        currentRule: interventionRule
+        currentRule: interventionRule,
+        mapDimensions: `${learningParams.nrow}×${learningParams.ncol}` 
       },
       statistics: stats,
       history: interventionHistory 
     };
-  }, [interventionHistory, interventionRule, getInterventionStats]);
+  }, [interventionHistory, interventionRule, getInterventionStats, learningParams.nrow, learningParams.ncol]); 
 
   /**
    * Clear intervention history
@@ -214,7 +230,6 @@ export const useIntervention = ({
     };
     console.log('Intervention history cleared');
   }, []);
-
 
   // ==================== Return Interface ====================
   return {
