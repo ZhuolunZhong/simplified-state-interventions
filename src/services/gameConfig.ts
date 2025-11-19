@@ -94,7 +94,7 @@ export const getMapDimensions = (mapDesc: MapDesc) => {
 };
 
 /**
- * 获取地图的起点状态
+ * Obtain the starting point state of the map
  */
 export const getStartState = (mapDesc: MapDesc): number => {
   const ncol = mapDesc[0].length;
@@ -105,11 +105,11 @@ export const getStartState = (mapDesc: MapDesc): number => {
       }
     }
   }
-  return 0; // 默认回退到状态0
+  return 0; 
 };
 
 /**
- * 检查状态是否是起点
+ * Check if the state is the starting point
  */
 export const isStartState = (state: number, mapDesc: MapDesc): boolean => {
   const ncol = mapDesc[0].length;
