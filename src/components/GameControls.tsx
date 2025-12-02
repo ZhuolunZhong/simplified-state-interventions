@@ -12,7 +12,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
   onStep,
   interventionRule,
   onRuleChange,
-  episode
+  episode,
+  agentStepDelay, 
+  onStepDelayChange 
 }) => {
   // Intervention rule options
   const interventionRules: { value: InterventionRule; label: string; description: string }[] = [
@@ -101,6 +103,12 @@ export const GameControls: React.FC<GameControlsProps> = ({
     return currentRule?.description || '';
   };
 
+  // handle step delay change
+  const handleStepDelayChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newDelay = parseInt(event.target.value, 10);
+    onStepDelayChange(newDelay);
+  };
+
   return (
     <div className="game-controls">
       {/* Main control area */}
@@ -149,6 +157,58 @@ export const GameControls: React.FC<GameControlsProps> = ({
           >
             🔄 Reset
           </button>
+        </div>
+      </div>
+
+      {/* step delay selection area */}
+      <div className="control-section">
+        <h3>Agent's moving speed</h3>
+        <div className="speed-control">
+          <div className="speed-labels">
+            <span>slow</span>
+            <span className="current-speed">{(agentStepDelay / 1000).toFixed(1)}s/step</span>
+            <span>fast</span>
+          </div>
+          <input
+            type="range"
+            className="speed-slider"
+            min="100"
+            max="2000"
+            step="100"
+            value={agentStepDelay}
+            onChange={handleStepDelayChange}
+            title={`Adjust the movement speed of the agent: ${agentStepDelay}ms`}
+          />
+          <div className="speed-presets">
+            <button
+              className={`speed-preset ${agentStepDelay === 2000 ? 'active' : ''}`}
+              onClick={() => onStepDelayChange(2000)}
+              title="Slow speed: 2秒/step"
+            >
+              Slow speed
+            </button>
+            <button
+              className={`speed-preset ${agentStepDelay === 1000 ? 'active' : ''}`}
+              onClick={() => onStepDelayChange(1000)}
+              title="Normal: 1秒/step"
+            >
+              Normal
+            </button>
+            <button
+              className={`speed-preset ${agentStepDelay === 500 ? 'active' : ''}`}
+              onClick={() => onStepDelayChange(500)}
+              title="Fast: 0.5秒/step"
+            >
+              Fast
+            </button>
+            <button
+              className={`speed-preset ${agentStepDelay === 200 ? 'active' : ''}`}
+              onClick={() => onStepDelayChange(200)}
+              title="Super fast: 0.2秒/step"
+            >
+              Super fast
+            </button>
+          </div>
         </div>
       </div>
 
@@ -222,6 +282,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
         <ul className="hints-list">
           <li>🎯 <strong>Spacebar</strong> - Start/Pause training</li>
           <li>🖱️ Drag agent on map for intervention</li>
+          <li>🐢 <strong>drag the slider</strong> - adjust the agent speed</li>
           <li>⚡ <strong>S key</strong> - Single step execution</li>
           <li>🔄 <strong>R key</strong> - Reset game</li>
           <li>ESC - Stop training</li>

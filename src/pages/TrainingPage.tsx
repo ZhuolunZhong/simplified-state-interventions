@@ -19,9 +19,10 @@ interface TrainingPageProps {
 export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => {
   // ==================== State Definitions ====================
   // Game configuration
-  const [gameConfig] = useState(() => ({
+   const [gameConfig, setGameConfig] = useState(() => ({
     ...DEFAULT_GAME_CONFIG,
-    mapDesc: MAP_CONFIGS.LINEAR_1x16
+    mapDesc: MAP_CONFIGS.LINEAR_1x16,
+    agentStepDelay: 500
   }));
 
   const [activeInfoTab, setActiveInfoTab] = useState<'status' | 'qtable'>('status');
@@ -31,6 +32,14 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   const [episodeSteps, setEpisodeSteps] = useState<number[]>([]);
   const [trainingStartTime, setTrainingStartTime] = useState<number>(0);
   const [trainingTime, setTrainingTime] = useState<number>(0);
+  const handleStepDelayChange = useCallback((newDelay: number) => {
+    setGameConfig(prev => ({
+      ...prev,
+      agentStepDelay: newDelay
+    }));
+    console.log(`The agent speed is adjusted to: ${newDelay}ms`);
+  }, []);
+
 
   // ==================== Hook Initialization ====================
   // Calculate state space size
@@ -278,6 +287,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
             interventionRule={interventionRule}
             onRuleChange={setInterventionRule}
             episode={gameStats.episode}
+            agentStepDelay={gameConfig.agentStepDelay} 
+            onStepDelayChange={handleStepDelayChange}
           />
         </div>
       </div>

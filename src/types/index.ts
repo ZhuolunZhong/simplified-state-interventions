@@ -150,6 +150,8 @@ export interface GameControlsProps {
   interventionRule: InterventionRule;
   onRuleChange: (rule: InterventionRule) => void;
   episode: number;
+  agentStepDelay: number; 
+  onStepDelayChange: (delay: number) => void; 
 }
 
 export interface StatusPanelProps {
