@@ -173,3 +173,46 @@
   font-family: 'Courier New', monospace;
   font-weight: bold;
 }
+
+.action-q-value.unavailable {
+  opacity: 0.5;
+  background-color: #f8f9fa;
+}
+
+.action-q-value.unavailable .action-direction {
+  color: #6c757d;
+}
+
+.action-q-value.unavailable .action-label::after {
+  content: " (unavailable)";
+  font-size: 0.8em;
+  color: #dc3545;
+}
+
+.qtable-cell.no-actions {
+  background: #e9ecef !important;
+}
+
+.qtable-cell.no-actions .action-arrow {
+  color: #6c757d;
+}
+
+.legend-color.unavailable-action {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e9ecef;
+  border-radius: 4px;
+  color: #6c757d;
+}
+
+.availability-summary {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #6c757d;
+}
