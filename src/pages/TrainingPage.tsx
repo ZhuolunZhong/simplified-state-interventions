@@ -9,6 +9,7 @@ import { useQLearning } from '../hooks/useQLearning';
 import { useIntervention } from '../hooks/useIntervention';
 import { DEFAULT_GAME_CONFIG, MAP_CONFIGS } from '../services/gameConfig';
 import { exportExperimentData } from '../services/exportService';
+import { ApiService } from '../services/apiService'; // Import API service
 import { InterventionRecord, ExperimentPhase, Action } from '../types';
 import './TrainingPage.css';
 
@@ -19,7 +20,7 @@ interface TrainingPageProps {
 export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => {
   // ==================== State Definitions ====================
   // Game configuration
-   const [gameConfig, setGameConfig] = useState(() => ({
+  const [gameConfig, setGameConfig] = useState(() => ({
     ...DEFAULT_GAME_CONFIG,
     mapDesc: MAP_CONFIGS.LINEAR_1x16,
     agentStepDelay: 500
@@ -32,14 +33,17 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   const [episodeSteps, setEpisodeSteps] = useState<number[]>([]);
   const [trainingStartTime, setTrainingStartTime] = useState<number>(0);
   const [trainingTime, setTrainingTime] = useState<number>(0);
-  const handleStepDelayChange = useCallback((newDelay: number) => {
-    setGameConfig(prev => ({
-      ...prev,
-      agentStepDelay: newDelay
-    }));
-    console.log(`The agent speed is adjusted to: ${newDelay}ms`);
-  }, []);
 
+  // Backend connection status
+  const [backendStatus, setBackendStatus] = useState<{
+    connected: boolean;
+    database: string;
+    loading: boolean;
+  }>({
+    connected: false,
+    database: 'unknown',
+    loading: true
+  });
 
   // ==================== Hook Initialization ====================
   // Calculate state space size
@@ -140,7 +144,47 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     }
   }, [trainingStartTime, gameStatus.isRunning]);
 
+  // Check backend connection
+  useEffect(() => {
+    const checkBackendConnection = async () => {
+      try {
+        setBackendStatus(prev => ({ ...prev, loading: true }));
+        const status = await ApiService.testConnection();
+        
+        setBackendStatus({
+          connected: status.status === 'connected',
+          database: status.database || 'unknown',
+          loading: false
+        });
+        
+        if (status.status === 'connected') {
+          console.log('✅ Backend service connected');
+        } else {
+          console.warn('⚠️ Backend service unavailable, data will be saved locally only');
+        }
+      } catch (error) {
+        console.error('Backend connection check failed:', error);
+        setBackendStatus({
+          connected: false,
+          database: 'unknown',
+          loading: false
+        });
+      }
+    };
+    
+    checkBackendConnection();
+  }, []);
+
   // ==================== Business Logic Functions ====================
+  // Handle agent step delay change
+  const handleStepDelayChange = useCallback((newDelay: number) => {
+    setGameConfig(prev => ({
+      ...prev,
+      agentStepDelay: newDelay
+    }));
+    console.log(`Agent speed adjusted to: ${newDelay}ms`);
+  }, []);
+
   // Start game handler - record start time
   const handleStartGame = useCallback(() => {
     if (!trainingStartTime) {
@@ -173,16 +217,44 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     setTrainingTime(0);
   }, [resetGame, resetQTable]);
 
+  /**
+   * Fix duplicate episode data issue
+   * Removes duplicates when episodeRewards length is double the actual episode count
+   */
+  const getFilteredEpisodeData = useCallback(() => {
+    const actualEpisodes = gameStats.episode;
+    
+    if (episodeRewards.length <= actualEpisodes) {
+      // No duplicates, return as is
+      return {
+        rewards: episodeRewards,
+        steps: episodeSteps
+      };
+    }
+    
+    // If duplicates exist, take only the last 'actualEpisodes' entries
+    console.warn(`Detected duplicate episode data: ${episodeRewards.length} entries for ${actualEpisodes} episodes. Filtering...`);
+    
+    return {
+      rewards: episodeRewards.slice(-actualEpisodes),
+      steps: episodeSteps.slice(-actualEpisodes)
+    };
+  }, [episodeRewards, episodeSteps, gameStats.episode]);
+
   // Complete training and go to results page
-  const handleCompleteTraining = useCallback(() => {
+  const handleCompleteTraining = useCallback(async () => {
     const finalTrainingTime = trainingStartTime ? 
       Math.floor((Date.now() - trainingStartTime) / 1000) : trainingTime;
 
+    // Fix duplicate episode data before export
+    const filteredData = getFilteredEpisodeData();
+    
+    // Generate experiment data
     const exportData = exportExperimentData(
       qtable,
       gameStats,
-      episodeRewards,
-      episodeSteps,
+      filteredData.rewards,
+      filteredData.steps,
       interventionHistory,
       learningParams,
       gameConfig,
@@ -190,10 +262,60 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
       finalTrainingTime
     );
 
-    onPhaseChange('results', exportData);
+    try {
+      // Save to backend database if connected
+      let saveResult = null;
+      
+      if (backendStatus.connected) {
+        try {
+          console.log('📤 Saving experiment data to database...');
+          saveResult = await ApiService.saveExperiment(exportData);
+          
+          if (saveResult.success) {
+            console.log('✅ Experiment data saved to database:', {
+              experimentId: saveResult.experimentId,
+              episodes: saveResult.dataSummary?.episodes,
+              interventions: saveResult.dataSummary?.interventions
+            });
+          }
+        } catch (saveError) {
+          console.warn('⚠️ Database save failed, but continuing with local processing:', saveError);
+        }
+      } else {
+        console.warn('⚠️ Backend unavailable, skipping database save');
+      }
+
+      // Enhance data with save status
+      const enhancedData = {
+        ...exportData,
+        backendInfo: {
+          savedToDatabase: saveResult?.success || false,
+          experimentId: saveResult?.experimentId || null,
+          savedAt: saveResult?.savedAt || null,
+          backendConnected: backendStatus.connected
+        }
+      };
+
+      // Navigate to results page
+      onPhaseChange('results', enhancedData);
+
+    } catch (error) {
+      console.error('Error processing experiment data:', error);
+      // Even if error occurs, allow user to see results
+      alert('An error occurred while processing experiment data, but local results have been generated.');
+      onPhaseChange('results', exportData);
+    }
   }, [
-    qtable, gameStats, episodeRewards, episodeSteps, interventionHistory,
-    learningParams, gameConfig, interventionRule, trainingStartTime, trainingTime,
+    qtable, 
+    gameStats, 
+    getFilteredEpisodeData, // Use filtered data
+    interventionHistory,
+    learningParams, 
+    gameConfig, 
+    interventionRule, 
+    trainingStartTime, 
+    trainingTime,
+    backendStatus.connected, 
     onPhaseChange
   ]);
 
@@ -208,17 +330,40 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
             className="complete-button"
             onClick={handleCompleteTraining}
             disabled={gameStats.episode === 0}
+            title={backendStatus.connected ? 
+              "Complete training and save to database" : 
+              "Complete training (backend unavailable, local save only)"
+            }
           >
             📊 View Training Results
+            {!backendStatus.connected && !backendStatus.loading && (
+              <span className="backend-status offline">(offline)</span>
+            )}
+            {backendStatus.connected && (
+              <span className="backend-status online">(connected)</span>
+            )}
           </button>
+          
           <span className="episode-counter">
             Current Episode: <strong>{gameStats.episode}</strong>
           </span>
+          
           {trainingTime > 0 && (
             <span className="training-time">
               Training Time: <strong>{trainingTime}s</strong>
             </span>
           )}
+          
+          {/* Backend status indicator */}
+          <div className="backend-indicator">
+            {backendStatus.loading ? (
+              <span className="status loading">🔵 Checking backend...</span>
+            ) : backendStatus.connected ? (
+              <span className="status connected">✅ Backend connected</span>
+            ) : (
+              <span className="status disconnected">⚠️ Backend disconnected</span>
+            )}
+          </div>
         </div>
       </div>
 

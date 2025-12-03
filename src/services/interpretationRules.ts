@@ -5,7 +5,7 @@ export const suggestionRule: InterventionFunction = (
   qtable: QTable,
   params: InterventionParams
 ): QTable => {
-  const { state, reward, newState, learningRate, nrow, ncol } = params;
+  const { state, reward, newState, learningRate, nrow, ncol, gamma } = params;
   
   const updatedQTable = qtable.map(row => [...row]);
   
@@ -38,7 +38,7 @@ export const suggestionRule: InterventionFunction = (
   const currentQ = updatedQTable[state][actionToUpdate];
   const maxNextQ = Math.max(...updatedQTable[newState]);
   const newQValue = currentQ + learningRate * (
-    1 + maxNextQ - currentQ
+    1 + gamma * maxNextQ - currentQ
   );
   
   updatedQTable[state][actionToUpdate] = newQValue;
@@ -50,14 +50,14 @@ export const resetRule: InterventionFunction = (
   qtable: QTable,
   params: InterventionParams
 ): QTable => {
-  const { state, reward, newState, action, learningRate } = params;
+  const { state, reward, newState, action, learningRate, gamma } = params;
   
   const updatedQTable = qtable.map(row => [...row]);
   
   const currentQ = updatedQTable[state][action];
   const maxNextQ = Math.max(...updatedQTable[newState]);
   const newQValue = currentQ + learningRate * (
-    reward + maxNextQ - currentQ
+    reward + gamma * maxNextQ - currentQ
   );
   
   updatedQTable[state][action] = newQValue;
@@ -76,14 +76,14 @@ export const impedeRule: InterventionFunction = (
   qtable: QTable,
   params: InterventionParams
 ): QTable => {
-  const { state, newState, action, learningRate } = params;
+  const { state, newState, action, learningRate, gamma } = params;
   
   const updatedQTable = qtable.map(row => [...row]);
   
   const currentQ = updatedQTable[state][action];
   const maxNextQ = Math.max(...updatedQTable[newState]);
   const newQValue = currentQ + learningRate * (
-    -1 + maxNextQ - currentQ
+    -1 + gamma * maxNextQ - currentQ
   );
   
   updatedQTable[state][action] = newQValue;
