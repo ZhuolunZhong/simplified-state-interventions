@@ -98,11 +98,20 @@ export const QTableVisualizer: React.FC<QTableVisualizerProps> = ({
   // Get cell background color
   const getCellBackgroundColor = (qValue: number): string => {
     const intensity = getQValueIntensity(qValue);
-    // Gradient from blue (low) to red (high)
-    const hue = (1 - intensity) * 240; // Blue(240°) to Red(0°)
-    return `hsl(${hue}, 70%, 50%)`;
+    
+    if (intensity < 0.5) {
+      const hue = 0; 
+      const saturation = 80;
+      const lightness = 50 - (intensity * 20); 
+      return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    } else {
+      const hue = 60 + ((intensity - 0.5) * 120); 
+      const saturation = 80;
+      const lightness = 30 + ((intensity - 0.5) * 20); 
+      return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    }
   };
-
+  
   // Check if an action is available
   const isActionAvailable = (state: number, action: Action): boolean => {
     return getPolicyData[state].availableActions.includes(action);

@@ -331,6 +331,88 @@ export const useQLearning = ({
     }, []);
   }, [qtable, getBestActionForState, getActionDirection]);
 
+  /**
+   * Predict the actual action that will be taken (considering exploration)
+   * This shows what the agent WILL do, not just what it SHOULD do
+   */
+  const predictAction = useCallback((state: number): Action => {
+    const { epsilon } = learningParams;
+    const availableActions = getAvailableActions(state);
+
+    if (availableActions.length === 0) {
+      return 0 as Action;
+    }
+
+    // Use the same RNG seed to ensure consistency with chooseAction
+    const explorExploitTradeoff = rngRef.current.uniform();
+    
+    // Exploration: randomly select from available actions with ε probability
+    if (explorExploitTradeoff < epsilon) {
+      return rngRef.current.choice(availableActions);
+    }
+
+    // Exploitation: select action with maximum Q-value from available actions
+    return getBestActionFromAvailable(state, availableActions);
+  }, [learningParams.epsilon, getAvailableActions, getBestActionFromAvailable]);
+
+  /**
+   * Get action prediction with details (action, type, probability)
+   */
+  const getActionPrediction = useCallback((state: number) => {
+    const { epsilon } = learningParams;
+    const availableActions = getAvailableActions(state);
+    
+    if (availableActions.length === 0) {
+      return {
+        action: 0 as Action,
+        type: 'none' as 'exploration' | 'exploitation' | 'none',
+        probability: 0,
+        availableActions: []
+      };
+    }
+
+    // Calculate probabilities
+    const explorExploitTradeoff = rngRef.current.uniform();
+    const isExploration = explorExploitTradeoff < epsilon;
+    
+    if (isExploration) {
+      // Exploration: equal probability for all available actions
+      return {
+        action: rngRef.current.choice(availableActions),
+        type: 'exploration' as const,
+        probability: epsilon,
+        availableActions,
+        randomValue: explorExploitTradeoff
+      };
+    } else {
+      // Exploitation: choose best action
+      const bestAction = getBestActionFromAvailable(state, availableActions);
+      
+      // Count how many actions share the maximum Q-value
+      const availableQValues = availableActions.map(action => ({
+        action,
+        qValue: qtable[state][action]
+      }));
+      
+      const maxQValue = Math.max(...availableQValues.map(item => item.qValue));
+      const bestActions = availableQValues
+        .filter(({ qValue }) => qValue === maxQValue)
+        .map(({ action }) => action);
+      
+      const tieProbability = 1 / bestActions.length;
+      
+      return {
+        action: bestAction,
+        type: 'exploitation' as const,
+        probability: 1 - epsilon,
+        availableActions,
+        bestActions,
+        tieProbability,
+        isTie: bestActions.length > 1
+      };
+    }
+  }, [learningParams.epsilon, qtable, getAvailableActions, getBestActionFromAvailable]);
+
   // ==================== Return Interface ====================
   return {
     // State
@@ -353,6 +435,8 @@ export const useQLearning = ({
     getQTableStats,
     getQTableDirections,
     getActionDirection,
-    getAvailableActions 
+    getAvailableActions,
+    predictAction,
+    getActionPrediction, 
   };
 };

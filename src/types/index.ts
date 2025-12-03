@@ -138,6 +138,11 @@ export interface FrozenLakeBoardProps {
   qtable?: QTable; // For Q-value visualization
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  predictedAction?: {
+    action: Action;
+    type: 'exploration' | 'exploitation' | 'none';
+    probability: number;
+  } | null;
 }
 
 export interface GameControlsProps {

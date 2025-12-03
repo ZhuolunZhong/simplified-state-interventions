@@ -1,6 +1,6 @@
 // src/components/FrozenLakeBoard.tsx
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { FrozenLakeBoardProps, Position, CellType } from '../types';
+import { FrozenLakeBoardProps, Position, CellType, Action } from '../types';
 import './FrozenLakeBoard.css';
 
 export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
@@ -11,7 +11,8 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
   isIntervening = false,
   qtable,
   onDragStart,
-  onDragEnd
+  onDragEnd,
+  predictedAction, 
 }) => {
   const [dragging, setDragging] = useState(false);
   const [dragStartState, setDragStartState] = useState<number | null>(null);
@@ -41,6 +42,40 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
   const getCellType = useCallback((row: number, col: number): CellType => {
     return mapDesc[row][col] as CellType;
   }, [mapDesc]);
+
+  // Get action direction arrow
+  const getActionDirection = useCallback((action: Action): string => {
+    const directions = { 
+      0: '←', // Left
+      1: '↓', // Down
+      2: '→', // Right  
+      3: '↑'  // Up
+    };
+    return directions[action] || '?';
+  }, []);
+
+  // Get color class for action type
+  const getActionColorClass = useCallback((type: 'exploration' | 'exploitation' | 'none'): string => {
+    switch (type) {
+      case 'exploration':
+        return 'action-exploration';
+      case 'exploitation':
+        return 'action-exploitation';
+      default:
+        return 'action-none';
+    }
+  }, []);
+
+  // Get tooltip text for prediction
+  const getPredictionTooltip = useCallback(() => {
+    if (!predictedAction) return '';
+    
+    const direction = getActionDirection(predictedAction.action);
+    const typeText = predictedAction.type === 'exploration' ? 'Exploration' : 'Exploitation';
+    const probability = (predictedAction.probability * 100).toFixed(0);
+    
+    return `Predicted action: ${direction} (${typeText}, ${probability}%)`;
+  }, [predictedAction, getActionDirection]);
 
   const getGridPositionFromPixel = useCallback((clientX: number, clientY: number): Position | null => {
     if (!boardRef.current) return null;
@@ -191,12 +226,14 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     );
   }, [dragging, mousePosition, cellSize]);
 
-  // Render cell
   const renderCell = useCallback((row: number, col: number) => {
     const state = positionToState({ row, col });
     const cellType = getCellType(row, col);
     const isAgentHere = !dragging && agentState === state;
     const isDragTarget = dragging && dragPosition?.row === row && dragPosition?.col === col;
+    
+    // Check if this is the agent's current position and has predicted action
+    const showPrediction = isAgentHere && predictedAction && predictedAction.action !== undefined;
     
     return (
       <div
@@ -209,12 +246,23 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
           const position = getAgentPosition(state);
           onCellClick?.(state, position);
         }}
-        title={`State: ${state}, Type: ${cellType}`}
+        title={`State: ${state}, Type: ${cellType}${
+          showPrediction ? `\n${getPredictionTooltip()}` : ''
+        }`}
         style={{ margin: 0, padding: 0 }}
       >
         <div className="cell-content">
           {isAgentHere && !dragging ? '🤖' : getCellEmoji(cellType)}
         </div>
+        
+        {/* Action prediction indicator */}
+        {showPrediction && (
+          <div className={`action-prediction ${getActionColorClass(predictedAction.type)}`}>
+            <div className="prediction-arrow">
+              {getActionDirection(predictedAction.action)}
+            </div>
+          </div>
+        )}
         
         {/* Drag target highlight */}
         {isDragTarget && (
@@ -231,7 +279,11 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     handleMouseDown,
     getAgentPosition, 
     onCellClick,
-    getCellEmoji
+    getCellEmoji,
+    predictedAction, 
+    getPredictionTooltip, 
+    getActionDirection, 
+    getActionColorClass 
   ]);
 
   return (

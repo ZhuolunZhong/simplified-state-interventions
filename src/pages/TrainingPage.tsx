@@ -34,6 +34,13 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   const [trainingStartTime, setTrainingStartTime] = useState<number>(0);
   const [trainingTime, setTrainingTime] = useState<number>(0);
 
+  // Action prediction state
+  const [predictedAction, setPredictedAction] = useState<{
+    action: Action;
+    type: 'exploration' | 'exploitation' | 'none';
+    probability: number;
+  } | null>(null);
+
   // Backend connection status
   const [backendStatus, setBackendStatus] = useState<{
     connected: boolean;
@@ -56,7 +63,9 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     chooseAction, 
     updateQValue,  
     updateQTable,
-    resetQTable
+    resetQTable,
+    predictAction, 
+    getActionPrediction
   } = useQLearning({
     initialParams: {
       stateSize: stateSize,
@@ -143,6 +152,35 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
       return () => clearInterval(interval);
     }
   }, [trainingStartTime, gameStatus.isRunning]);
+
+  // Update action prediction when state changes
+  useEffect(() => {
+    if (!agentState.isDone && gameStatus.isRunning && !gameStatus.isPaused) {
+      const prediction = getActionPrediction(agentState.currentState);
+      setPredictedAction({
+        action: prediction.action,
+        type: prediction.type,
+        probability: prediction.probability
+      });
+      
+      // Debug log
+      console.log(`Action prediction updated:`, {
+        state: agentState.currentState,
+        action: prediction.action,
+        type: prediction.type,
+        probability: prediction.probability.toFixed(2)
+      });
+    } else {
+      // Clear prediction when game is not running
+      setPredictedAction(null);
+    }
+  }, [
+    agentState.currentState, 
+    agentState.isDone, 
+    gameStatus.isRunning, 
+    gameStatus.isPaused, 
+    getActionPrediction
+  ]);
 
   // Check backend connection
   useEffect(() => {
@@ -374,6 +412,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
             <FrozenLakeBoard
               mapDesc={gameConfig.mapDesc}
               agentState={agentState.currentState}
+              predictedAction={predictedAction}
               onCellClick={handleCellClick}
               onAgentDrop={handleAgentDrop}
               isIntervening={isIntervening}

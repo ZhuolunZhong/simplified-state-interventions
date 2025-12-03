@@ -113,3 +113,115 @@
   border-radius: 3px;
   white-space: nowrap;
 }
+
+.action-prediction {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: bold;
+  z-index: 5;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  animation: pulse 2s infinite;
+  background: white;
+}
+
+@keyframes pulse {
+  0% { 
+    transform: scale(1);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  }
+  50% { 
+    transform: scale(1.15);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.6);
+  }
+  100% { 
+    transform: scale(1);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+  }
+}
+
+.prediction-arrow {
+  font-size: 1.6rem;
+  text-shadow: 
+    1px 1px 0 rgba(0,0,0,0.3),
+    -1px -1px 0 rgba(255,255,255,0.5);
+}
+
+.action-exploration {
+  background: white;
+  color: #d97706;
+  border: 3px solid #f59e0b;
+}
+
+.action-exploitation {
+  background: white;
+  color: #059669;
+  border: 3px solid #10b981;
+}
+
+.action-none {
+  background: white;
+  color: #6b7280;
+  border: 3px solid #9ca3af;
+}
+
+.cell-with-agent:hover .action-prediction {
+  transform: scale(1.25);
+  z-index: 10;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+}
+
+.cell-with-agent .cell-content {
+  position: relative;
+  z-index: 2;
+}
+
+.cell-with-agent .action-prediction {
+  z-index: 3;
+}
+
+.action-prediction::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+  z-index: -1;
+}
+
+.cell-hole .action-prediction,
+.cell-goal .action-prediction {
+  filter: drop-shadow(0 0 3px rgba(255,255,255,0.8));
+}
+
+@media (max-width: 768px) {
+  .action-prediction {
+    width: 28px;
+    height: 28px;
+    font-size: 1.2rem;
+    top: -6px;
+    right: -6px;
+  }
+  
+  .prediction-arrow {
+    font-size: 1.4rem;
+  }
+  
+  .prediction-type {
+    width: 18px;
+    height: 18px;
+    font-size: 0.8rem;
+    top: -8px;
+    right: -8px;
+  }
+}

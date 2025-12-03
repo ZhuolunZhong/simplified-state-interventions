@@ -165,9 +165,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
         <h3>Agent's moving speed</h3>
         <div className="speed-control">
           <div className="speed-labels">
-            <span>slow</span>
-            <span className="current-speed">{(agentStepDelay / 1000).toFixed(1)}s/step</span>
             <span>fast</span>
+            <span className="current-speed">{(agentStepDelay / 1000).toFixed(1)}s/step</span>
+            <span>slow</span>
           </div>
           <input
             type="range"
@@ -183,28 +183,28 @@ export const GameControls: React.FC<GameControlsProps> = ({
             <button
               className={`speed-preset ${agentStepDelay === 2000 ? 'active' : ''}`}
               onClick={() => onStepDelayChange(2000)}
-              title="Slow speed: 2秒/step"
+              title="Slow speed: 2s/step"
             >
-              Slow speed
+              Slow
             </button>
             <button
               className={`speed-preset ${agentStepDelay === 1000 ? 'active' : ''}`}
               onClick={() => onStepDelayChange(1000)}
-              title="Normal: 1秒/step"
+              title="Normal: 1s/step"
             >
               Normal
             </button>
             <button
               className={`speed-preset ${agentStepDelay === 500 ? 'active' : ''}`}
               onClick={() => onStepDelayChange(500)}
-              title="Fast: 0.5秒/step"
+              title="Fast: 0.5s/step"
             >
               Fast
             </button>
             <button
               className={`speed-preset ${agentStepDelay === 200 ? 'active' : ''}`}
               onClick={() => onStepDelayChange(200)}
-              title="Super fast: 0.2秒/step"
+              title="Super fast: 0.2s/step"
             >
               Super fast
             </button>
