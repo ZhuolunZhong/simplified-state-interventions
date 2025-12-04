@@ -9,7 +9,7 @@ import { useQLearning } from '../hooks/useQLearning';
 import { useIntervention } from '../hooks/useIntervention';
 import { DEFAULT_GAME_CONFIG, MAP_CONFIGS } from '../services/gameConfig';
 import { exportExperimentData } from '../services/exportService';
-import { ApiService } from '../services/apiService'; // Import API service
+import { ApiService } from '../services/apiService';
 import { InterventionRecord, ExperimentPhase, Action } from '../types';
 import './TrainingPage.css';
 
@@ -19,7 +19,6 @@ interface TrainingPageProps {
 
 export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => {
   // ==================== State Definitions ====================
-  // Game configuration
   const [gameConfig, setGameConfig] = useState(() => ({
     ...DEFAULT_GAME_CONFIG,
     mapDesc: MAP_CONFIGS.LINEAR_1x16,
@@ -27,21 +26,17 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   }));
 
   const [activeInfoTab, setActiveInfoTab] = useState<'status' | 'qtable'>('status');
-
-  // Training data collection
   const [episodeRewards, setEpisodeRewards] = useState<number[]>([]);
   const [episodeSteps, setEpisodeSteps] = useState<number[]>([]);
   const [trainingStartTime, setTrainingStartTime] = useState<number>(0);
   const [trainingTime, setTrainingTime] = useState<number>(0);
 
-  // Action prediction state
-  const [predictedAction, setPredictedAction] = useState<{
+  // Announced action state for UI display
+  const [announcedAction, setAnnouncedAction] = useState<{
     action: Action;
-    type: 'exploration' | 'exploitation' | 'none';
-    probability: number;
+    type: 'exploration' | 'exploitation';
   } | null>(null);
 
-  // Backend connection status
   const [backendStatus, setBackendStatus] = useState<{
     connected: boolean;
     database: string;
@@ -53,10 +48,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   });
 
   // ==================== Hook Initialization ====================
-  // Calculate state space size
   const stateSize = gameConfig.mapDesc.length * gameConfig.mapDesc[0].length;
 
-  // Initialize Q-learning
   const { 
     qtable, 
     learningParams,
@@ -64,8 +57,8 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     updateQValue,  
     updateQTable,
     resetQTable,
-    predictAction, 
-    getActionPrediction
+    getAnnouncedAction,
+    clearActionHistory
   } = useQLearning({
     initialParams: {
       stateSize: stateSize,
@@ -75,31 +68,27 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   });
 
   // ==================== Callback Definitions ====================
-  const handleStep = useCallback((state: number, action: number, reward: number, newState: number) => {
-    updateQValue(state, action as Action, reward, newState);
+  const handleStep = useCallback((state: number, action: Action, reward: number, newState: number) => {
+    updateQValue(state, action, reward, newState);
   }, [updateQValue]);
 
-  // Episode end callback - collect data
   const handleEpisodeEnd = useCallback((stats: any) => {
     console.log(`Episode ${stats.episode} ended:`, stats);
-    
-    // Collect data for each episode
     setEpisodeRewards(prev => [...prev, stats.lastReward]);
     setEpisodeSteps(prev => [...prev, stats.steps]);
-  }, []);
+    clearActionHistory();
+    setAnnouncedAction(null);
+  }, [clearActionHistory]);
 
-  // Intervention callback
   const handleIntervention = useCallback((fromState: number, toState: number) => {
     console.log(`Intervention: ${fromState} -> ${toState}`);
   }, []);
 
-  // Intervention applied callback
   const handleInterventionApplied = useCallback((record: InterventionRecord) => {
     console.log('Intervention applied:', record);
   }, []);
 
   // ==================== More Hook Initialization ====================
-  // Initialize game engine
   const {
     agentState,
     gameStatus,
@@ -113,7 +102,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     startDrag,
     endDrag,
     calculateReward,
-    isTerminalState,
     getAgentPosition
   } = useGameEngine({
     config: gameConfig,
@@ -124,7 +112,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     onIntervention: handleIntervention
   });
 
-  // Initialize intervention system
   const {
     interventionRule,
     isIntervening,
@@ -135,7 +122,7 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   } = useIntervention({
     qtable,
     updateQTable,
-    chooseAction,
+    getAnnouncedAction,
     learningRate: learningParams.learningRate,
     gamma: learningParams.gamma,
     learningParams: learningParams,
@@ -143,7 +130,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   });
 
   // ==================== Side Effects ====================
-  // Training time tracking
   useEffect(() => {
     if (trainingStartTime && gameStatus.isRunning) {
       const interval = setInterval(() => {
@@ -153,36 +139,26 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     }
   }, [trainingStartTime, gameStatus.isRunning]);
 
-  // Update action prediction when state changes
   useEffect(() => {
     if (!agentState.isDone && gameStatus.isRunning && !gameStatus.isPaused) {
-      const prediction = getActionPrediction(agentState.currentState);
-      setPredictedAction({
-        action: prediction.action,
-        type: prediction.type,
-        probability: prediction.probability
-      });
-      
-      // Debug log
-      console.log(`Action prediction updated:`, {
-        state: agentState.currentState,
-        action: prediction.action,
-        type: prediction.type,
-        probability: prediction.probability.toFixed(2)
-      });
+      const actionInfo = getAnnouncedAction(agentState.currentState);
+      if (actionInfo) {
+        setAnnouncedAction({
+          action: actionInfo.action,
+          type: actionInfo.type
+        });
+      }
     } else {
-      // Clear prediction when game is not running
-      setPredictedAction(null);
+      setAnnouncedAction(null);
     }
   }, [
     agentState.currentState, 
     agentState.isDone, 
     gameStatus.isRunning, 
     gameStatus.isPaused, 
-    getActionPrediction
+    getAnnouncedAction
   ]);
 
-  // Check backend connection
   useEffect(() => {
     const checkBackendConnection = async () => {
       try {
@@ -214,7 +190,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   }, []);
 
   // ==================== Business Logic Functions ====================
-  // Handle agent step delay change
   const handleStepDelayChange = useCallback((newDelay: number) => {
     setGameConfig(prev => ({
       ...prev,
@@ -223,7 +198,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     console.log(`Agent speed adjusted to: ${newDelay}ms`);
   }, []);
 
-  // Start game handler - record start time
   const handleStartGame = useCallback(() => {
     if (!trainingStartTime) {
       setTrainingStartTime(Date.now());
@@ -231,7 +205,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     startGame();
   }, [startGame, trainingStartTime]);
 
-  // Handle agent drag (intervention)
   const handleAgentDrop = useCallback((fromState: number, toState: number) => {
     console.log(`Drag intervention: ${fromState} -> ${toState}`);
     
@@ -240,37 +213,31 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     setAgentState(toState);
   }, [applyIntervention, calculateReward, setAgentState]);
 
-  // Handle cell click
   const handleCellClick = useCallback((state: number, position: any) => {
     console.log('Cell clicked:', { state, position });
   }, []);
 
-  // Reset game and Q-table - clear collected data
   const handleReset = useCallback(() => {
     resetGame();
     resetQTable();
+    clearActionHistory();
     setEpisodeRewards([]);
     setEpisodeSteps([]);
     setTrainingStartTime(0);
     setTrainingTime(0);
-  }, [resetGame, resetQTable]);
+    setAnnouncedAction(null);
+  }, [resetGame, resetQTable, clearActionHistory]);
 
-  /**
-   * Fix duplicate episode data issue
-   * Removes duplicates when episodeRewards length is double the actual episode count
-   */
   const getFilteredEpisodeData = useCallback(() => {
     const actualEpisodes = gameStats.episode;
     
     if (episodeRewards.length <= actualEpisodes) {
-      // No duplicates, return as is
       return {
         rewards: episodeRewards,
         steps: episodeSteps
       };
     }
     
-    // If duplicates exist, take only the last 'actualEpisodes' entries
     console.warn(`Detected duplicate episode data: ${episodeRewards.length} entries for ${actualEpisodes} episodes. Filtering...`);
     
     return {
@@ -279,15 +246,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     };
   }, [episodeRewards, episodeSteps, gameStats.episode]);
 
-  // Complete training and go to results page
   const handleCompleteTraining = useCallback(async () => {
     const finalTrainingTime = trainingStartTime ? 
       Math.floor((Date.now() - trainingStartTime) / 1000) : trainingTime;
 
-    // Fix duplicate episode data before export
     const filteredData = getFilteredEpisodeData();
     
-    // Generate experiment data
     const exportData = exportExperimentData(
       qtable,
       gameStats,
@@ -301,7 +265,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     );
 
     try {
-      // Save to backend database if connected
       let saveResult = null;
       
       if (backendStatus.connected) {
@@ -323,7 +286,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
         console.warn('⚠️ Backend unavailable, skipping database save');
       }
 
-      // Enhance data with save status
       const enhancedData = {
         ...exportData,
         backendInfo: {
@@ -334,19 +296,17 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
         }
       };
 
-      // Navigate to results page
       onPhaseChange('results', enhancedData);
 
     } catch (error) {
       console.error('Error processing experiment data:', error);
-      // Even if error occurs, allow user to see results
       alert('An error occurred while processing experiment data, but local results have been generated.');
       onPhaseChange('results', exportData);
     }
   }, [
     qtable, 
     gameStats, 
-    getFilteredEpisodeData, // Use filtered data
+    getFilteredEpisodeData,
     interventionHistory,
     learningParams, 
     gameConfig, 
@@ -392,7 +352,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
             </span>
           )}
           
-          {/* Backend status indicator */}
           <div className="backend-indicator">
             {backendStatus.loading ? (
               <span className="status loading">🔵 Checking backend...</span>
@@ -406,13 +365,12 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
       </div>
 
       <div className="training-content">
-        {/* Left: Game map and status panel */}
         <div className="game-area">
           <div className="map-container">
             <FrozenLakeBoard
               mapDesc={gameConfig.mapDesc}
               agentState={agentState.currentState}
-              predictedAction={predictedAction}
+              announcedAction={announcedAction}
               onCellClick={handleCellClick}
               onAgentDrop={handleAgentDrop}
               isIntervening={isIntervening}
@@ -459,7 +417,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
           </div>
         </div>
 
-        {/* Right: Control panel */}
         <div className="controls-area">
           <GameControls
             isRunning={gameStatus.isRunning}
@@ -477,7 +434,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
         </div>
       </div>
 
-      {/* Training information panel */}
       <div className="training-info">
         <div className="info-card">
           <h4>📈 Learning Progress</h4>

@@ -8,7 +8,6 @@
   margin-bottom: 50px;
 }
 
-
 .board-container {
   display: block;
   border: 2px solid #333;
@@ -42,6 +41,7 @@
   padding: 0;
   box-sizing: border-box;
   vertical-align: top;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .cell:hover {
@@ -65,74 +65,36 @@
   border: 2px solid #ffc107 !important;
 }
 
-.dragging-agent {
-  position: fixed;
-  width: 60px;
-  height: 60px;
+.cell-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 2px solid #007acc;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  pointer-events: none;
-  z-index: 10000; 
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 2;
 }
 
-.drag-hint {
-  background: #e3f2fd;
-  border: 1px solid #2196f3;
-  border-radius: 4px;
-  padding: 8px 16px;
-  color: #1976d2;
-  font-size: 14px;
+/* Action announcement styles - 恢复到气泡设计 */
+.action-announcement {
   position: absolute;
-  bottom: -45px; 
-  left: 0;
-  right: 0;
-  z-index: 10;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.frozen-lake-board.dragging {
-  transform: none;
-  margin-bottom: 50px; 
-}
-
-.drag-hint .position-info {
-  font-size: 12px;
-  color: #666;
-  background: rgba(255, 255, 255, 0.7);
-  padding: 2px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
-}
-
-.action-prediction {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 32px;
-  height: 32px;
+  top: -10px;
+  right: -10px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 1.4rem;
-  font-weight: bold;
   z-index: 5;
   box-shadow: 0 3px 8px rgba(0,0,0,0.4);
-  animation: pulse 2s infinite;
+  animation: announcement-pulse 2s infinite;
   background: white;
+  pointer-events: none;
 }
 
-@keyframes pulse {
+@keyframes announcement-pulse {
   0% { 
     transform: scale(1);
     box-shadow: 0 3px 8px rgba(0,0,0,0.4);
@@ -147,47 +109,37 @@
   }
 }
 
-.prediction-arrow {
-  font-size: 1.6rem;
+.announcement-arrow {
+  font-size: 20px;
+  font-weight: bold;
+  line-height: 1;
+  margin-top: -1px;
   text-shadow: 
     1px 1px 0 rgba(0,0,0,0.3),
     -1px -1px 0 rgba(255,255,255,0.5);
 }
 
+.announcement-type {
+  font-size: 10px;
+  line-height: 1;
+  margin-top: -4px;
+  opacity: 0.9;
+}
+
+/* Exploration style - Orange theme */
 .action-exploration {
-  background: white;
-  color: #d97706;
   border: 3px solid #f59e0b;
 }
 
-.action-exploitation {
-  background: white;
-  color: #059669;
-  border: 3px solid #10b981;
+.action-exploration .announcement-arrow {
+  color: #d97706;
 }
 
-.action-none {
-  background: white;
-  color: #6b7280;
-  border: 3px solid #9ca3af;
+.action-exploration .announcement-type {
+  color: #d97706;
 }
 
-.cell-with-agent:hover .action-prediction {
-  transform: scale(1.25);
-  z-index: 10;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
-}
-
-.cell-with-agent .cell-content {
-  position: relative;
-  z-index: 2;
-}
-
-.cell-with-agent .action-prediction {
-  z-index: 3;
-}
-
-.action-prediction::before {
+.action-exploration::before {
   content: '';
   position: absolute;
   top: 2px;
@@ -195,33 +147,180 @@
   right: 2px;
   bottom: 2px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.9), rgba(254, 215, 170, 0.7));
   z-index: -1;
 }
 
-.cell-hole .action-prediction,
-.cell-goal .action-prediction {
+/* Exploitation style - Green theme */
+.action-exploitation {
+  border: 3px solid #10b981;
+}
+
+.action-exploitation .announcement-arrow {
+  color: #059669;
+}
+
+.action-exploitation .announcement-type {
+  color: #059669;
+}
+
+.action-exploitation::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(236, 253, 245, 0.9), rgba(209, 250, 229, 0.7));
+  z-index: -1;
+}
+
+/* Hover effects */
+.cell-with-agent:hover .action-announcement {
+  transform: scale(1.25);
+  z-index: 10;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+}
+
+.cell-with-agent .action-announcement {
+  z-index: 3;
+}
+
+/* Special cells */
+.cell-hole .action-announcement,
+.cell-goal .action-announcement {
   filter: drop-shadow(0 0 3px rgba(255,255,255,0.8));
 }
 
+/* Drag and drop styles */
+.dragging-agent {
+  position: fixed;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #007acc;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  z-index: 10000;
+}
+
+.drag-target-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 235, 59, 0.3);
+  border: 2px dashed #ffc107;
+  z-index: 5;
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+.drag-hint {
+  background: #e3f2fd;
+  border: 1px solid #2196f3;
+  border-radius: 4px;
+  padding: 8px 16px;
+  color: #1976d2;
+  font-size: 14px;
+  position: absolute;
+  bottom: -45px;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.frozen-lake-board.dragging {
+  transform: none;
+  margin-bottom: 50px;
+}
+
+.drag-hint .position-info {
+  font-size: 12px;
+  color: #666;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+/* Responsive styles */
 @media (max-width: 768px) {
-  .action-prediction {
+  .action-announcement {
     width: 28px;
     height: 28px;
-    font-size: 1.2rem;
     top: -6px;
     right: -6px;
   }
   
-  .prediction-arrow {
-    font-size: 1.4rem;
+  .announcement-arrow {
+    font-size: 16px;
   }
   
-  .prediction-type {
-    width: 18px;
-    height: 18px;
-    font-size: 0.8rem;
-    top: -8px;
-    right: -8px;
+  .announcement-type {
+    font-size: 8px;
+    margin-top: -3px;
+  }
+  
+  .cell {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+  
+  .grid-row {
+    height: 50px;
+  }
+  
+  .dragging-agent {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .action-announcement {
+    width: 24px;
+    height: 24px;
+    top: -4px;
+    right: -4px;
+  }
+  
+  .announcement-arrow {
+    font-size: 14px;
+  }
+  
+  .announcement-type {
+    font-size: 7px;
+    margin-top: -2px;
+  }
+  
+  .cell {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+  
+  .grid-row {
+    height: 40px;
+  }
+  
+  .dragging-agent {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
   }
 }

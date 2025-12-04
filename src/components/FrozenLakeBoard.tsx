@@ -12,7 +12,7 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
   qtable,
   onDragStart,
   onDragEnd,
-  predictedAction, 
+  announcedAction, // Changed from predictedAction to announcedAction
 }) => {
   const [dragging, setDragging] = useState(false);
   const [dragStartState, setDragStartState] = useState<number | null>(null);
@@ -55,7 +55,7 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
   }, []);
 
   // Get color class for action type
-  const getActionColorClass = useCallback((type: 'exploration' | 'exploitation' | 'none'): string => {
+  const getActionColorClass = useCallback((type: 'exploration' | 'exploitation'): string => {
     switch (type) {
       case 'exploration':
         return 'action-exploration';
@@ -66,32 +66,28 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     }
   }, []);
 
-  // Get tooltip text for prediction
-  const getPredictionTooltip = useCallback(() => {
-    if (!predictedAction) return '';
+  // Get tooltip text for announced action
+  const getAnnouncementTooltip = useCallback(() => {
+    if (!announcedAction) return '';
     
-    const direction = getActionDirection(predictedAction.action);
-    const typeText = predictedAction.type === 'exploration' ? 'Exploration' : 'Exploitation';
-    const probability = (predictedAction.probability * 100).toFixed(0);
+    const direction = getActionDirection(announcedAction.action);
+    const typeText = announcedAction.type === 'exploration' ? 'Exploration' : 'Exploitation';
     
-    return `Predicted action: ${direction} (${typeText}, ${probability}%)`;
-  }, [predictedAction, getActionDirection]);
+    return `Next action: ${direction} (${typeText})`;
+  }, [announcedAction, getActionDirection]);
 
   const getGridPositionFromPixel = useCallback((clientX: number, clientY: number): Position | null => {
     if (!boardRef.current) return null;
     
     const rect = boardRef.current.getBoundingClientRect();
     
-    // Calculate coordinates relative to grid content area (subtracting border and padding)
     const contentX = clientX - rect.left;
     const contentY = clientY - rect.top;
     
-    // Check if within grid content area
     if (contentX < 0 || contentY < 0 || contentX >= rect.width || contentY >= rect.height) {
       return null;
     }
     
-    // Precisely calculate grid position
     const col = Math.floor(contentX / cellSize);
     const row = Math.floor(contentY / cellSize);
     
@@ -109,7 +105,6 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     const contentX = clientX - rect.left;
     const contentY = clientY - rect.top;
     
-    // Force constrain within grid boundaries
     const col = Math.max(0, Math.min(ncol - 1, Math.floor(contentX / cellSize)));
     const row = Math.max(0, Math.min(nrow - 1, Math.floor(contentY / cellSize)));
     
@@ -127,14 +122,13 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     }
   }, []);
 
+  // Drag and drop handlers
   useEffect(() => {
     const handleGlobalMouseMove = (event: MouseEvent) => {
       if (!dragging) return;
       
-      // Precisely update mouse position
       setMousePosition({ x: event.clientX, y: event.clientY });
       
-      // Precisely calculate grid position
       const gridPos = getGridPositionFromPixel(event.clientX, event.clientY);
       setDragPosition(gridPos);
     };
@@ -142,22 +136,13 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     const handleGlobalMouseUp = (event: MouseEvent) => {
       if (!dragging || dragStartState === null) return;
       
-      console.log('🖱️ End drag (global)');
-      
-      // Use precise grid position calculation
       const gridPos = getClosestGridPosition(event.clientX, event.clientY);
       const toState = positionToState(gridPos);
       
-      console.log('📏 Drop position calculation:', gridPos, 'State:', toState);
-      
       if (toState !== dragStartState && onAgentDrop) {
-        console.log('🚀 Calling onAgentDrop');
         onAgentDrop(dragStartState, toState);
-      } else {
-        console.log('⚠️ Same position or no callback');
       }
       
-      // Clean up state
       setDragging(false);
       setDragStartState(null);
       setDragPosition(null);
@@ -167,8 +152,6 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     if (dragging) {
       document.addEventListener('mousemove', handleGlobalMouseMove);
       document.addEventListener('mouseup', handleGlobalMouseUp);
-      
-      // Prevent text selection
       document.body.style.userSelect = 'none';
     }
 
@@ -182,7 +165,6 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
   const handleMouseDown = useCallback((event: React.MouseEvent, state: number) => {
     if (state !== agentState) return;
     
-    console.log('🐭 Start dragging agent');
     event.preventDefault();
     event.stopPropagation();
     
@@ -190,7 +172,6 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     setDragStartState(state);
     setMousePosition({ x: event.clientX, y: event.clientY });
     
-    // Initial drag position
     const gridPos = getGridPositionFromPixel(event.clientX, event.clientY);
     setDragPosition(gridPos);
     
@@ -232,8 +213,8 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     const isAgentHere = !dragging && agentState === state;
     const isDragTarget = dragging && dragPosition?.row === row && dragPosition?.col === col;
     
-    // Check if this is the agent's current position and has predicted action
-    const showPrediction = isAgentHere && predictedAction && predictedAction.action !== undefined;
+    // Check if this is the agent's current position and has announced action
+    const showAnnouncement = isAgentHere && announcedAction && announcedAction.action !== undefined;
     
     return (
       <div
@@ -247,7 +228,7 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
           onCellClick?.(state, position);
         }}
         title={`State: ${state}, Type: ${cellType}${
-          showPrediction ? `\n${getPredictionTooltip()}` : ''
+          showAnnouncement ? `\n${getAnnouncementTooltip()}` : ''
         }`}
         style={{ margin: 0, padding: 0 }}
       >
@@ -255,11 +236,14 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
           {isAgentHere && !dragging ? '🤖' : getCellEmoji(cellType)}
         </div>
         
-        {/* Action prediction indicator */}
-        {showPrediction && (
-          <div className={`action-prediction ${getActionColorClass(predictedAction.type)}`}>
-            <div className="prediction-arrow">
-              {getActionDirection(predictedAction.action)}
+        {/* Action announcement indicator */}
+        {showAnnouncement && (
+          <div className={`action-announcement ${getActionColorClass(announcedAction.type)}`}>
+            <div className="announcement-arrow">
+              {getActionDirection(announcedAction.action)}
+            </div>
+            <div className="announcement-type">
+              {announcedAction.type === 'exploration' ? '🔍' : '🎯'}
             </div>
           </div>
         )}
@@ -280,8 +264,8 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     getAgentPosition, 
     onCellClick,
     getCellEmoji,
-    predictedAction, 
-    getPredictionTooltip, 
+    announcedAction, 
+    getAnnouncementTooltip, 
     getActionDirection, 
     getActionColorClass 
   ]);

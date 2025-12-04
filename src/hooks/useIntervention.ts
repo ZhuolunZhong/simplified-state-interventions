@@ -6,14 +6,15 @@ import {
   InterventionParams,
   UseInterventionProps,
   QTable,
-  Action
+  Action,
+  DeterministicActionInfo
 } from '../types';
 import { applyInterventionRule } from '../services/interpretationRules';
 
 export const useIntervention = ({
   qtable,
   updateQTable,
-  chooseAction,
+  getAnnouncedAction,
   learningRate,
   gamma,
   onInterventionApplied,
@@ -33,9 +34,6 @@ export const useIntervention = ({
   });
 
   // ==================== Core Intervention Functions ====================
-  /**
-   * Apply intervention rule with correct map dimensions
-   */
   const applyIntervention = useCallback((
     fromState: number, 
     toState: number, 
@@ -43,6 +41,7 @@ export const useIntervention = ({
     additionalParams?: Partial<InterventionParams>
   ) => {
     const startTime = performance.now();
+    
     if (fromState < 0 || fromState >= qtable.length) {
       console.error(`Invalid start state: ${fromState}`);
       return;
@@ -61,8 +60,16 @@ export const useIntervention = ({
     setIsIntervening(true);
 
     try {      
-      // Get the action the agent originally intended to take
-      const intendedAction = chooseAction(fromState);
+      // Get the deterministic action info that was stored when chooseAction was called
+      const actionInfo = getAnnouncedAction(fromState);
+      
+      if (!actionInfo) {
+        console.error(`No announced action found for state ${fromState}. Cannot apply intervention.`);
+        setIsIntervening(false);
+        return;
+      }
+
+      const intendedAction = actionInfo.action;
       
       const interventionParams: InterventionParams = {
         state: fromState,
@@ -82,10 +89,12 @@ export const useIntervention = ({
         nrow: learningParams.nrow,
         ncol: learningParams.ncol,
         intendedAction,
+        actionType: actionInfo.type,
+        randomValue: actionInfo.randomValue,
         rule: interventionRule
       });
 
-      // Apply intervention rule
+      // Apply intervention rule using the deterministic action
       const newQTable = applyInterventionRule(
         interventionRule,
         qtable,
@@ -95,13 +104,15 @@ export const useIntervention = ({
       // Update Q-table
       updateQTable(newQTable);
 
-      // Create intervention record
+      // Create intervention record with additional context
       const interventionRecord: InterventionRecord = {
         timestamp: Date.now(),
         fromState,
         toState,
         rule: interventionRule,
-        reward
+        reward,
+        action: intendedAction,
+        actionType: actionInfo.type
       };
 
       // Update history
@@ -118,6 +129,7 @@ export const useIntervention = ({
         toState,
         reward,
         intendedAction,
+        actionType: actionInfo.type,
         learningRate,
         mapDimensions: `${learningParams.nrow}×${learningParams.ncol}` 
       });
@@ -133,7 +145,7 @@ export const useIntervention = ({
     isIntervening,
     qtable,
     interventionRule,
-    chooseAction,
+    getAnnouncedAction,
     learningRate,
     gamma,
     learningParams.nrow, 
@@ -142,9 +154,6 @@ export const useIntervention = ({
     onInterventionApplied
   ]);
 
-  /**
-   * Set intervention rule
-   */
   const setInterventionRuleWithReset = useCallback((newRule: InterventionRule) => {
     if (newRule !== interventionRule) {
       setInterventionRule(newRule);
@@ -153,9 +162,6 @@ export const useIntervention = ({
   }, [interventionRule]);
 
   // ==================== Statistics and Analysis Functions ====================
-  /**
-   * Get intervention statistics
-   */
   const getInterventionStats = useCallback(() => {
     const total = interventionHistory.length;
     const byRule = interventionCountRef.current;
@@ -164,44 +170,41 @@ export const useIntervention = ({
       ? interventionHistory[interventionHistory.length - 1] 
       : undefined;
 
-    // Calculate usage percentage for each rule
     const byRulePercentage = Object.entries(byRule).reduce((acc, [rule, count]) => {
       acc[rule as InterventionRule] = total > 0 ? (count / total) * 100 : 0;
       return acc;
     }, {} as Record<InterventionRule, number>);
 
-    // Calculate average reward
     const averageReward = total > 0 
       ? interventionHistory.reduce((sum, record) => sum + record.reward, 0) / total 
       : 0;
+
+    // Calculate statistics by action type
+    const byActionType = interventionHistory.reduce((acc, record) => {
+      const type = record.actionType || 'unknown';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
     return {
       total,
       byRule,
       byRulePercentage,
+      byActionType,
       lastIntervention,
       averageReward,
       mapDimensions: `${learningParams.nrow}×${learningParams.ncol}` 
     };
   }, [interventionHistory, learningParams.nrow, learningParams.ncol]); 
 
-  /**
-   * Get recent intervention records
-   */
   const getRecentInterventions = useCallback((count: number = 5) => {
     return interventionHistory.slice(-count).reverse();
   }, [interventionHistory]);
 
-  /**
-   * Filter intervention records by rule
-   */
   const getInterventionsByRule = useCallback((rule: InterventionRule) => {
     return interventionHistory.filter(record => record.rule === rule);
   }, [interventionHistory]);
 
-  /**
-   * Export intervention history data
-   */
   const exportInterventionData = useCallback(() => {
     const stats = getInterventionStats();
     
@@ -217,9 +220,6 @@ export const useIntervention = ({
     };
   }, [interventionHistory, interventionRule, getInterventionStats, learningParams.nrow, learningParams.ncol]); 
 
-  /**
-   * Clear intervention history
-   */
   const clearInterventionHistory = useCallback(() => {
     setInterventionHistory([]);
     interventionCountRef.current = {

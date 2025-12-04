@@ -25,6 +25,7 @@ export interface AgentState {
   steps: number;
   lastReward: number;
   isDone: boolean;
+  nextAction: Action | null;
 }
 
 export interface LearningParams {
@@ -48,7 +49,7 @@ export interface InterventionParams {
   state: number;
   reward: number;
   newState: number;
-  action: number;
+  action: Action;
   learningRate: number;
   gamma: number; 
   nrow: number; 
@@ -66,6 +67,8 @@ export interface InterventionRecord {
   toState: number;
   rule: InterventionRule;
   reward: number;
+  action?: Action; 
+  actionType?: 'exploration' | 'exploitation';
 }
 
 // ==================== Game Engine Types ====================
@@ -128,6 +131,14 @@ export interface StoredData {
   };
 }
 
+export interface DeterministicActionInfo {
+  action: Action;
+  type: 'exploration' | 'exploitation';
+  randomValue: number;
+  state: number;
+  timestamp: number;
+}
+
 // ==================== Component Props Types ====================
 export interface FrozenLakeBoardProps {
   mapDesc: MapDesc;
@@ -138,10 +149,9 @@ export interface FrozenLakeBoardProps {
   qtable?: QTable; // For Q-value visualization
   onDragStart?: () => void;
   onDragEnd?: () => void;
-  predictedAction?: {
+  announcedAction?: {
     action: Action;
-    type: 'exploration' | 'exploitation' | 'none';
-    probability: number;
+    type: 'exploration' | 'exploitation';
   } | null;
 }
 
@@ -177,7 +187,7 @@ export interface UseGameEngineProps {
   chooseAction?: (state: number) => Action;
   updateQValue?: (state: number, action: Action, reward: number, newState: number) => void;
   applyIntervention?: (fromState: number, toState: number, reward: number) => void; 
-  onStep?: (state: number, action: number, reward: number, newState: number) => void;
+  onStep?: (state: number, action: Action, reward: number, newState: number) => void;
   onEpisodeEnd?: (stats: GameStats) => void;
   onIntervention?: (fromState: number, toState: number) => void;
 }
@@ -192,72 +202,10 @@ export interface UseQLearningProps {
 export interface UseInterventionProps {
   qtable: QTable;
   updateQTable: (newQTable: QTable) => void;
-  chooseAction: (state: number) => Action;
+  getAnnouncedAction: (state: number) => DeterministicActionInfo | null; 
   learningRate: number;
   gamma: number;
   onInterventionApplied?: (record: InterventionRecord) => void;
-}
-
-// ==================== Hook Return Types ====================
-export interface UseGameEngineReturn {
-  // State
-  agentState: AgentState;
-  gameStatus: GameStatus;
-  gameStats: GameStats;
-  isDragging: boolean;
-  
-  // Utility functions
-  getAgentPosition: (state: number) => Position;
-  positionToState: (position: Position) => number;
-  isTerminalState: (state: number) => boolean;
-  calculateReward: (state: number) => number;
-  
-  // Actions
-  startGame: () => void;
-  pauseGame: () => void;
-  resetGame: () => void;
-  stepGame: () => void;
-  setAgentState: (newState: number) => void;
-  applyIntervention: (fromState: number, toState: number) => void;
-  startDrag: () => void;
-  endDrag: () => void;
-}
-
-export interface UseQLearningReturn {
-  // State
-  qtable: QTable;
-  learningParams: LearningParams;
-  
-  // Actions
-  chooseAction: (state: number) => Action;
-  updateQValue: (state: number, action: Action, reward: number, newState: number) => void;
-  updateQTable: (newQTable: QTable) => void;
-  resetQTable: () => void;
-  setLearningParams: (params: Partial<LearningParams>) => void;
-  
-  // Analysis tools
-  getBestActionForState: (state: number) => { action: Action; qValue: number };
-  getPolicy: () => Action[];
-  getQTableStats: () => { min: number; max: number; average: number; std: number };
-  getQTableDirections: (mapDesc: string[]) => string[][];
-  getActionDirection: (action: Action) => string;
-  getAvailableActions: (state: number) => Action[]; 
-}
-
-export interface UseInterventionReturn {
-  // State
-  interventionRule: InterventionRule;
-  interventionHistory: InterventionRecord[];
-  isIntervening: boolean;
-  
-  // Actions
-  setInterventionRule: (rule: InterventionRule) => void;
-  applyIntervention: (fromState: number, toState: number) => void;
-  getInterventionStats: () => {
-    total: number;
-    byRule: Record<InterventionRule, number>;
-    lastIntervention?: InterventionRecord;
-  };
 }
 
 // ==================== Utility Types ====================
@@ -281,15 +229,6 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   isSlippery: false,
   agentStepDelay: 500
 };
-
-export interface UseGameEngineProps {
-  config: GameConfig;
-  chooseAction?: (state: number) => Action; // Using Action type
-  updateQValue?: (state: number, action: Action, reward: number, newState: number) => void; // Using Action type
-  onStep?: (state: number, action: number, reward: number, newState: number) => void;
-  onEpisodeEnd?: (stats: GameStats) => void;
-  onIntervention?: (fromState: number, toState: number) => void;
-}
 
 // ==================== Data Export Types ====================
 export interface ExperimentExportData {

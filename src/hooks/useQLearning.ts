@@ -5,7 +5,7 @@ import {
   LearningParams, 
   UseQLearningProps,
   Action,
-  Position
+  DeterministicActionInfo
 } from '../types';
 
 export const useQLearning = ({ 
@@ -15,26 +15,19 @@ export const useQLearning = ({
   onQTableUpdate 
 }: UseQLearningProps = {}) => {
   // ==================== Calculated Parameters ====================
-  /**
-   * Calculate learning parameters based on map description
-   * This replaces the static DEFAULT_LEARNING_PARAMS
-   */
   const calculatedParams = useMemo((): LearningParams => {
-    // Base parameters from initialParams or defaults
     const baseParams = {
       learningRate: 0.8,
       gamma: 0.95,
       epsilon: 0.1,
-      stateSize: 16,      // Will be overridden if mapDesc is provided
+      stateSize: 16,
       actionSize: 4,
-      nrow: 4,            // Will be overridden if mapDesc is provided  
-      ncol: 4             // Will be overridden if mapDesc is provided
+      nrow: 4,
+      ncol: 4
     };
 
-    // Apply user-provided initial parameters
     Object.assign(baseParams, initialParams);
 
-    // 🎯 KEY CHANGE: Calculate dimensions from map description if available
     if (mapDesc && mapDesc.length > 0 && mapDesc[0].length > 0) {
       const nrow = mapDesc.length;
       const ncol = mapDesc[0].length;
@@ -49,7 +42,6 @@ export const useQLearning = ({
       };
     }
 
-    // Fallback: assume square map if no mapDesc provided
     console.warn('No map description provided, assuming square map');
     const stateSize = baseParams.stateSize;
     const dimension = Math.sqrt(stateSize);
@@ -65,7 +57,6 @@ export const useQLearning = ({
   const [qtable, setQTable] = useState<QTable>(() => {
     if (initialState) return initialState;
     
-    // 🎯 KEY CHANGE: Use calculated parameters for initial Q-table
     const { stateSize, actionSize } = calculatedParams;
     return Array.from({ length: stateSize }, () => 
       Array.from({ length: actionSize }, () => 0)
@@ -73,6 +64,10 @@ export const useQLearning = ({
   });
 
   const [learningParams, setLearningParams] = useState<LearningParams>(calculatedParams);
+  
+  // Storage for deterministic action info (announced action)
+  const [currentActionInfo, setCurrentActionInfo] = useState<DeterministicActionInfo | null>(null);
+  const actionHistoryRef = useRef<Map<number, DeterministicActionInfo>>(new Map());
 
   // ==================== Ref Definitions ====================
   class SimpleRNG {
@@ -97,9 +92,6 @@ export const useQLearning = ({
   const rngRef = useRef<SimpleRNG>(new SimpleRNG(123));
 
   // ==================== Utility Functions ====================
-  /**
-   * Get available actions for a state using actual map dimensions
-   */
   const getAvailableActions = useCallback((state: number): Action[] => {
     const { nrow, ncol } = learningParams;
     const row = Math.floor(state / ncol);
@@ -107,46 +99,34 @@ export const useQLearning = ({
     
     const availableActions: Action[] = [];
     
-    // 🎯 KEY CHANGE: Use actual map dimensions from learningParams
-    // Check if each direction is available (not out of bounds)
-    if (col > 0) availableActions.push(0); // Left
-    if (row < nrow - 1) availableActions.push(1); // Down
-    if (col < ncol - 1) availableActions.push(2); // Right
-    if (row > 0) availableActions.push(3); // Up
+    if (col > 0) availableActions.push(0);
+    if (row < nrow - 1) availableActions.push(1);
+    if (col < ncol - 1) availableActions.push(2);
+    if (row > 0) availableActions.push(3);
     
     return availableActions;
-  }, [learningParams]); 
+  }, [learningParams]);
 
-  /**
-   * Select best action from available actions
-   */
   const getBestActionFromAvailable = useCallback((state: number, availableActions: Action[]): Action => {
     if (availableActions.length === 0) {
       return 0 as Action; 
     }
 
-    // Get Q-values for available actions
     const availableQValues = availableActions.map(action => ({
       action,
       qValue: qtable[state][action]
     }));
 
-    // Find maximum Q-value
     const maxQValue = Math.max(...availableQValues.map(item => item.qValue));
     
-    // Select actions with maximum Q-value (there might be multiple)
     const bestActions = availableQValues
       .filter(({ qValue }) => qValue === maxQValue)
       .map(({ action }) => action);
 
-    // Use new choice method to randomly select one best action
     return rngRef.current.choice(bestActions);
   }, [qtable]);
 
   // ==================== Q-learning Core Functions ====================
-  /**
-   * Choose action - ε-greedy policy (considering available actions)
-   */
   const chooseAction = useCallback((state: number): Action => {
     const { epsilon } = learningParams;
     const availableActions = getAvailableActions(state);
@@ -156,18 +136,38 @@ export const useQLearning = ({
       return 0 as Action;
     }
 
-    // Exploration: randomly select from available actions with ε probability
-    if (rngRef.current.uniform() < epsilon) {
-      return rngRef.current.choice(availableActions);
+    // Generate random value for this decision
+    const randomValue = rngRef.current.uniform();
+    const isExploration = randomValue < epsilon;
+    
+    let action: Action;
+    let type: 'exploration' | 'exploitation';
+    
+    if (isExploration) {
+      // Exploration: randomly select from available actions
+      action = rngRef.current.choice(availableActions);
+      type = 'exploration';
+    } else {
+      // Exploitation: select action with maximum Q-value
+      action = getBestActionFromAvailable(state, availableActions);
+      type = 'exploitation';
     }
 
-    // Exploitation: select action with maximum Q-value from available actions
-    return getBestActionFromAvailable(state, availableActions);
+    // Store deterministic action info for announcement
+    const actionInfo: DeterministicActionInfo = {
+      action,
+      type,
+      randomValue,
+      state,
+      timestamp: Date.now()
+    };
+    
+    setCurrentActionInfo(actionInfo);
+    actionHistoryRef.current.set(state, actionInfo);
+
+    return action;
   }, [learningParams, getAvailableActions, getBestActionFromAvailable]);
 
-  /**
-   * Update Q-value - Q-learning core update formula
-   */
   const updateQValue = useCallback((
     state: number, 
     action: Action, 
@@ -193,17 +193,11 @@ export const useQLearning = ({
     });
   }, [learningParams, onQTableUpdate]);
 
-  /**
-   * Batch update Q-table (for intervention rules)
-   */
   const updateQTable = useCallback((newQTable: QTable) => {
     setQTable(newQTable);
     onQTableUpdate?.(newQTable);
   }, [onQTableUpdate]);
 
-  /**
-   * Reset Q-table using current learning parameters
-   */
   const resetQTable = useCallback(() => {
     const { stateSize, actionSize } = learningParams;
     const newQTable = Array.from({ length: stateSize }, () => 
@@ -211,13 +205,12 @@ export const useQLearning = ({
     );
     
     setQTable(newQTable);
+    actionHistoryRef.current.clear();
+    setCurrentActionInfo(null);
     onQTableUpdate?.(newQTable);
   }, [learningParams, onQTableUpdate]);
 
   // ==================== Parameter Management ====================
-  /**
-   * Update learning parameters with dimension validation
-   */
   const updateLearningParams = useCallback((newParams: Partial<LearningParams>) => {
     setLearningParams(prev => {
       const updated = { ...prev, ...newParams };
@@ -230,6 +223,8 @@ export const useQLearning = ({
           Array.from({ length: updated.actionSize }, () => 0)
         );
         setQTable(newQTable);
+        actionHistoryRef.current.clear();
+        setCurrentActionInfo(null);
         onQTableUpdate?.(newQTable);
       }
       
@@ -237,17 +232,35 @@ export const useQLearning = ({
     });
   }, [onQTableUpdate]);
 
-  /**
-   * Set random number generator seed
-   */
   const setRandomSeed = useCallback((seed: number) => {
     rngRef.current = new SimpleRNG(seed);
   }, []);
 
-  // ==================== Analysis Tools ====================
+  // ==================== Announcement Functions ====================
   /**
-   * Get best action and Q-value for state (considering available actions)
+   * Get announced action info for a specific state
+   * This provides deterministic information about what action WILL be taken
    */
+  const getAnnouncedAction = useCallback((state: number): DeterministicActionInfo | null => {
+    return actionHistoryRef.current.get(state) || null;
+  }, []);
+
+  /**
+   * Get current announced action (for UI display)
+   */
+  const getCurrentAnnouncedAction = useCallback((): DeterministicActionInfo | null => {
+    return currentActionInfo;
+  }, [currentActionInfo]);
+
+  /**
+   * Clear action history (called at episode reset)
+   */
+  const clearActionHistory = useCallback(() => {
+    actionHistoryRef.current.clear();
+    setCurrentActionInfo(null);
+  }, []);
+
+  // ==================== Analysis Tools ====================
   const getBestActionForState = useCallback((state: number): { action: Action; qValue: number } => {
     const availableActions = getAvailableActions(state);
     
@@ -269,9 +282,6 @@ export const useQLearning = ({
     return { action: bestAction, qValue: maxQValue };
   }, [qtable, getAvailableActions]);
 
-  /**
-   * Get policy (best action for each state, considering available actions)
-   */
   const getPolicy = useCallback((): Action[] => {
     return qtable.map((_, state) => {
       const { action } = getBestActionForState(state);
@@ -279,9 +289,6 @@ export const useQLearning = ({
     });
   }, [qtable, getBestActionForState]);
 
-  /**
-   * Get Q-value statistics
-   */
   const getQTableStats = useCallback(() => {
     const allQValues = qtable.flat();
     const average = allQValues.reduce((sum, val) => sum + val, 0) / allQValues.length;
@@ -295,9 +302,6 @@ export const useQLearning = ({
     };
   }, [qtable]);
 
-  /**
-   * Get visualization direction for action
-   */
   const getActionDirection = useCallback((action: Action): string => {
     const directions = { 
       0: '←', 1: '↓', 2: '→', 3: '↑'
@@ -305,9 +309,6 @@ export const useQLearning = ({
     return directions[action];
   }, []);
 
-  /**
-   * Get visualization direction map for entire Q-table using actual map dimensions
-   */
   const getQTableDirections = useCallback((mapDescForViz: string[]): string[][] => {
     const nrow = mapDescForViz.length;
     const ncol = mapDescForViz[0].length;
@@ -331,87 +332,9 @@ export const useQLearning = ({
     }, []);
   }, [qtable, getBestActionForState, getActionDirection]);
 
-  /**
-   * Predict the actual action that will be taken (considering exploration)
-   * This shows what the agent WILL do, not just what it SHOULD do
-   */
-  const predictAction = useCallback((state: number): Action => {
-    const { epsilon } = learningParams;
-    const availableActions = getAvailableActions(state);
-
-    if (availableActions.length === 0) {
-      return 0 as Action;
-    }
-
-    // Use the same RNG seed to ensure consistency with chooseAction
-    const explorExploitTradeoff = rngRef.current.uniform();
-    
-    // Exploration: randomly select from available actions with ε probability
-    if (explorExploitTradeoff < epsilon) {
-      return rngRef.current.choice(availableActions);
-    }
-
-    // Exploitation: select action with maximum Q-value from available actions
-    return getBestActionFromAvailable(state, availableActions);
-  }, [learningParams.epsilon, getAvailableActions, getBestActionFromAvailable]);
-
-  /**
-   * Get action prediction with details (action, type, probability)
-   */
-  const getActionPrediction = useCallback((state: number) => {
-    const { epsilon } = learningParams;
-    const availableActions = getAvailableActions(state);
-    
-    if (availableActions.length === 0) {
-      return {
-        action: 0 as Action,
-        type: 'none' as 'exploration' | 'exploitation' | 'none',
-        probability: 0,
-        availableActions: []
-      };
-    }
-
-    // Calculate probabilities
-    const explorExploitTradeoff = rngRef.current.uniform();
-    const isExploration = explorExploitTradeoff < epsilon;
-    
-    if (isExploration) {
-      // Exploration: equal probability for all available actions
-      return {
-        action: rngRef.current.choice(availableActions),
-        type: 'exploration' as const,
-        probability: epsilon,
-        availableActions,
-        randomValue: explorExploitTradeoff
-      };
-    } else {
-      // Exploitation: choose best action
-      const bestAction = getBestActionFromAvailable(state, availableActions);
-      
-      // Count how many actions share the maximum Q-value
-      const availableQValues = availableActions.map(action => ({
-        action,
-        qValue: qtable[state][action]
-      }));
-      
-      const maxQValue = Math.max(...availableQValues.map(item => item.qValue));
-      const bestActions = availableQValues
-        .filter(({ qValue }) => qValue === maxQValue)
-        .map(({ action }) => action);
-      
-      const tieProbability = 1 / bestActions.length;
-      
-      return {
-        action: bestAction,
-        type: 'exploitation' as const,
-        probability: 1 - epsilon,
-        availableActions,
-        bestActions,
-        tieProbability,
-        isTie: bestActions.length > 1
-      };
-    }
-  }, [learningParams.epsilon, qtable, getAvailableActions, getBestActionFromAvailable]);
+  const getAvailableActionsForState = useCallback((state: number): Action[] => {
+    return getAvailableActions(state);
+  }, [getAvailableActions]);
 
   // ==================== Return Interface ====================
   return {
@@ -425,6 +348,11 @@ export const useQLearning = ({
     updateQTable,
     resetQTable,
     
+    // Announcement system
+    getAnnouncedAction,
+    getCurrentAnnouncedAction,
+    clearActionHistory,
+    
     // Parameter management
     updateLearningParams,
     setRandomSeed,
@@ -435,8 +363,6 @@ export const useQLearning = ({
     getQTableStats,
     getQTableDirections,
     getActionDirection,
-    getAvailableActions,
-    predictAction,
-    getActionPrediction, 
+    getAvailableActions: getAvailableActionsForState,
   };
 };
