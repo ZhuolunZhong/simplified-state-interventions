@@ -19,6 +19,23 @@ export interface GameMap {
 export type Action = 0 | 1 | 2 | 3; // Corresponds to Python's 4 actions: Left, Down, Right, Up
 export type QTable = number[][]; // [state][action]
 
+export interface EpisodeData {
+  round: number;
+  episodeInRound: number;
+  reward: number;
+  steps: number;
+}
+
+export interface RoundQTable {
+  round: number;
+  qtable: QTable;
+}
+
+export interface RoundConfig {
+  totalRounds: number;
+  episodesPerRound: number;
+}
+
 export interface AgentState {
   currentState: number;
   totalReward: number;
@@ -69,6 +86,8 @@ export interface InterventionRecord {
   reward: number;
   action?: Action; 
   actionType?: 'exploration' | 'exploitation';
+  round?: number;
+  episode?: number;
 }
 
 // ==================== Game Engine Types ====================
@@ -86,6 +105,7 @@ export interface GameStats {
   lastReward: number;
   interventions: number;
   successRate: number;
+  currentRound: number;           
 }
 
 export interface GameStatus {
@@ -97,17 +117,19 @@ export interface GameStatus {
 
 // ==================== Experiment System Types ====================
 export type ExperimentPhase = 
+  | 'consent'
   | 'introduction' 
   | 'training' 
   | 'results';
 
 export interface ExperimentConfig {
   id: string;
-  participantId?: string;
   interventionRule: InterventionRule;
   totalEpisodes: number;
   createdAt: number;
   completedAt?: number;
+  totalRounds?: number;       
+  episodesPerRound?: number;
 }
 
 export interface ExperimentResults {
@@ -137,6 +159,7 @@ export interface DeterministicActionInfo {
   randomValue: number;
   state: number;
   timestamp: number;
+  valid: boolean;
 }
 
 // ==================== Component Props Types ====================
@@ -146,13 +169,15 @@ export interface FrozenLakeBoardProps {
   onCellClick?: (state: number, position: Position) => void;
   onAgentDrop?: (fromState: number, toState: number) => void;
   isIntervening?: boolean;
-  qtable?: QTable; // For Q-value visualization
+  qtable?: QTable; 
   onDragStart?: () => void;
   onDragEnd?: () => void;
   announcedAction?: {
     action: Action;
     type: 'exploration' | 'exploitation';
   } | null;
+  isGameRunning?: boolean;  
+  isGamePaused?: boolean;  
 }
 
 export interface GameControlsProps {
@@ -190,6 +215,8 @@ export interface UseGameEngineProps {
   onStep?: (state: number, action: Action, reward: number, newState: number) => void;
   onEpisodeEnd?: (stats: GameStats) => void;
   onIntervention?: (fromState: number, toState: number) => void;
+  resetQTable?: () => void;
+  markActionAsExecuted?: (state: number) => void;
 }
 
 export interface UseQLearningProps {
@@ -206,6 +233,8 @@ export interface UseInterventionProps {
   learningRate: number;
   gamma: number;
   onInterventionApplied?: (record: InterventionRecord) => void;
+  currentRound?: number;           
+  currentEpisode?: number;      
 }
 
 // ==================== Utility Types ====================
@@ -230,6 +259,19 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   agentStepDelay: 500
 };
 
+// ==================== Round Statistics Types ====================
+export interface RoundStats {
+  episodes: number;
+  totalReward: number;
+  totalSteps: number;
+  averageReward: number;
+  averageSteps: number;
+}
+
+export interface RoundSummary {
+  [round: number]: RoundStats;
+}
+
 // ==================== Data Export Types ====================
 export interface ExperimentExportData {
   // Metadata
@@ -250,26 +292,27 @@ export interface ExperimentExportData {
   
   // Training results
   results: {
-    finalQTable: QTable;
-    trainingStats: GameStats;  // Final statistics
-    episodeRewards: number[];  // Episode reward history
-    episodeSteps: number[];    // Episode step history
+    roundQTables: RoundQTable[];           // Q-tables for each round
+    trainingStats: GameStats;              // Final statistics
+    episodeData: EpisodeData[];            // Complete episode data with round info
+    roundStats: RoundSummary;              // Statistics per round
     successCount: number;
     trainingTime: number;
   };
   
-  // Intervention summary (optimized data volume)
+  // Intervention summary
   interventionSummary: {
     totalCount: number;
     byRule: Record<InterventionRule, number>;
+    byRound: Record<number, number>;
     averageReward: number;
-    // Simplified intervention history (removed bulky qtable data)
     recentInterventions: Array<{
       timestamp: number;
       fromState: number;
       toState: number;
       rule: InterventionRule;
       reward: number;
+      round?: number;
     }>;
   };
   
@@ -277,7 +320,27 @@ export interface ExperimentExportData {
   performanceMetrics: {
     averageStepsPerEpisode: number;
     averageRewardPerEpisode: number;
-    interventionFrequency: number; // Intervention frequency
-    learningProgress: number[];    // Learning progress (e.g., average reward per 10 episodes)
+    interventionFrequency: number;         // Intervention frequency
+    learningProgress: number[];            // Learning progress
   };
+  
+  // Survey data (new field)
+  surveyData: SurveyResponseData[];
+}
+
+// ==================== Survey System Types ====================
+export interface SurveyResponse {
+  round: number;                    // Round number
+  q1_naturality?: number;          // 1-5 rating
+  q2_learning_effect?: number;     // 1-5 rating  
+  q3_enjoyment?: number;           // 1-5 rating
+  q4_teaching_strategy?: string;   // Text response
+  q5_comments?: string;           // Text response
+  timestamp?: number;              // Response time
+  skipped?: boolean;              // Whether survey was skipped
+}
+
+export interface SurveyResponseData extends SurveyResponse {
+  experiment_id?: string;          // Optional experiment ID
+  user_id?: string;               // Optional user ID
 }

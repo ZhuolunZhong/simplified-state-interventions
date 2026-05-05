@@ -1,6 +1,6 @@
 // src/components/FrozenLakeBoard.tsx
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { FrozenLakeBoardProps, Position, CellType, Action } from '../types';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { FrozenLakeBoardProps, Position, CellType, Action, QTable } from '../types';
 import './FrozenLakeBoard.css';
 
 export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
@@ -12,7 +12,9 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
   qtable,
   onDragStart,
   onDragEnd,
-  announcedAction, // Changed from predictedAction to announcedAction
+  announcedAction,
+  isGameRunning = false,
+  isGamePaused = false,
 }) => {
   const [dragging, setDragging] = useState(false);
   const [dragStartState, setDragStartState] = useState<number | null>(null);
@@ -24,6 +26,26 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
   const nrow = mapDesc.length;
   const ncol = mapDesc[0].length;
   const cellSize = 60;
+
+  const shouldShowQTable = useMemo(() => {
+    if (typeof window === 'undefined') return true;
+    
+    try {
+      const userId = sessionStorage.getItem('user_id');
+      
+      if (!userId) return true;
+      const userIdNum = parseInt(userId);
+      if (isNaN(userIdNum)) return true;
+      const positionInCycle = ((userIdNum - 1) % 8) + 1;
+      return positionInCycle <= 4;
+    } catch (error) {
+      console.error('Error determining Q-table visibility:', error);
+      return true;
+    }
+  }, []);
+
+  // Determine if drag is currently allowed
+  const isDragAllowed = isGameRunning && !isGamePaused && !isIntervening;
 
   // Get agent position
   const getAgentPosition = useCallback((state: number): Position => {
@@ -76,6 +98,15 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     return `Next action: ${direction} (${typeText})`;
   }, [announcedAction, getActionDirection]);
 
+  // Get tooltip text for disabled state
+  const getDisabledTooltip = useCallback(() => {
+    if (!isGameRunning) return 'Start game to move agent';
+    if (isGamePaused) return 'Game is paused';
+    if (isIntervening) return 'Intervention in progress';
+    return '';
+  }, [isGameRunning, isGamePaused, isIntervening]);
+
+  // Get grid position from pixel coordinates
   const getGridPositionFromPixel = useCallback((clientX: number, clientY: number): Position | null => {
     if (!boardRef.current) return null;
     
@@ -98,6 +129,7 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     return null;
   }, [nrow, ncol, cellSize]);
 
+  // Get closest valid grid position
   const getClosestGridPosition = useCallback((clientX: number, clientY: number): Position => {
     if (!boardRef.current) return { row: 0, col: 0 };
     
@@ -111,7 +143,7 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     return { row, col };
   }, [nrow, ncol, cellSize]);
 
-  // Get cell emoji
+  // Get cell emoji representation
   const getCellEmoji = useCallback((cellType: CellType): string => {
     switch (cellType) {
       case 'S': return '🏁';
@@ -122,7 +154,7 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     }
   }, []);
 
-  // Drag and drop handlers
+  // Drag and drop event handlers
   useEffect(() => {
     const handleGlobalMouseMove = (event: MouseEvent) => {
       if (!dragging) return;
@@ -162,7 +194,17 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     };
   }, [dragging, dragStartState, onAgentDrop, onDragEnd, getGridPositionFromPixel, getClosestGridPosition, positionToState]);
 
+  // Handle mouse down for dragging agent
   const handleMouseDown = useCallback((event: React.MouseEvent, state: number) => {
+    if (!isDragAllowed) {
+      console.log('Drag not allowed - game state:', { 
+        isRunning: isGameRunning, 
+        isPaused: isGamePaused, 
+        isIntervening 
+      });
+      return;
+    }
+    
     if (state !== agentState) return;
     
     event.preventDefault();
@@ -176,8 +218,144 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     setDragPosition(gridPos);
     
     onDragStart?.();
-  }, [agentState, onDragStart, getGridPositionFromPixel]);
+  }, [agentState, isDragAllowed, isGameRunning, isGamePaused, isIntervening, onDragStart, getGridPositionFromPixel]);
 
+  // ==================== Q-TABLE VISUALIZATION LOGIC ====================
+
+  // Calculate Q-table visualization data
+  const qtableData = useMemo(() => {
+    if (!qtable) return null;
+
+    // Get available actions for each state (considering boundaries)
+    const getAvailableActions = (state: number): Action[] => {
+      const row = Math.floor(state / ncol);
+      const col = state % ncol;
+      const availableActions: Action[] = [];
+      
+      if (col > 0) availableActions.push(0);
+      if (row < nrow - 1) availableActions.push(1);
+      if (col < ncol - 1) availableActions.push(2);
+      if (row > 0) availableActions.push(3);
+      
+      return availableActions;
+    };
+
+    // Calculate policy data for each state
+    const policyData = qtable.map((stateQValues, state) => {
+      const availableActions = getAvailableActions(state);
+      
+      if (availableActions.length === 0) {
+        return {
+          bestAction: 0 as Action,
+          maxQValue: 0,
+          availableActions: [],
+          allEqual: true,
+          qValues: stateQValues
+        };
+      }
+
+      // Only consider available actions
+      const availableQValues = availableActions.map(action => ({
+        action,
+        qValue: stateQValues[action]
+      }));
+
+      const maxQValue = Math.max(...availableQValues.map(item => item.qValue));
+      const minQValue = Math.min(...availableQValues.map(item => item.qValue));
+      const allEqual = Math.abs(maxQValue - minQValue) < 0.001;
+
+      const bestActions = availableQValues
+        .filter(({ qValue }) => qValue === maxQValue)
+        .map(({ action }) => action);
+
+      const bestAction = bestActions[0] || availableActions[0];
+      
+      return {
+        bestAction,
+        maxQValue,
+        availableActions,
+        allEqual,
+        qValues: stateQValues
+      };
+    });
+
+    // Calculate Q-value range for color mapping
+    const allQValues = policyData.map(data => data.maxQValue);
+    const qValueRange = {
+      min: Math.min(...allQValues),
+      max: Math.max(...allQValues)
+    };
+
+    return { policyData, qValueRange };
+  }, [qtable, nrow, ncol]);
+
+  // Calculate background color based on Q-value
+  const getQValueColor = useCallback((qValue: number, qValueRange: { min: number; max: number }): string => {
+    if (qValueRange.max === qValueRange.min) return 'hsl(120, 60%, 85%)';
+    
+    const intensity = (qValue - qValueRange.min) / (qValueRange.max - qValueRange.min);
+    
+    const hue = 120; 
+    const saturation = 60; 
+    const lightness = 85 - (intensity * 50); 
+    
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  }, []);
+
+  // Render Q-table cell
+  const renderQTableCell = useCallback((row: number, col: number) => {
+    if (!qtableData || !shouldShowQTable) return null;
+    
+    const { policyData, qValueRange } = qtableData;
+    const state = row * ncol + col;
+    const data = policyData[state];
+    const cellType = getCellType(row, col);
+    
+    // Terminal states
+    if (cellType === 'H' || cellType === 'G') {
+      return (
+        <div
+          key={`q-${row}-${col}`}
+          className={`qtable-cell terminal-cell ${
+            cellType === 'H' ? 'hole-cell' : 'goal-cell'
+          }`}
+        >
+          {cellType === 'H' ? '🕳️' : '🎯'}
+        </div>
+      );
+    }
+
+    const backgroundColor = getQValueColor(data.maxQValue, qValueRange);
+    const isAgentHere = agentState === state;
+
+    const shouldShowArrow = !data.allEqual && data.availableActions.length > 0;
+
+    return (
+      <div
+        key={`q-${row}-${col}`}
+        className={`qtable-cell ${isAgentHere ? 'agent-cell' : ''} ${
+          data.availableActions.length === 0 ? 'no-actions' : ''
+        }`}
+        style={{ backgroundColor }}
+        title={`State ${state}: Q=${data.maxQValue.toFixed(2)}, Action=${getActionDirection(data.bestAction)}`}
+      >
+        <div className="qtable-cell-content">
+          {shouldShowArrow ? (
+            <div className="qtable-action-arrow">
+              {getActionDirection(data.bestAction || 0)}
+            </div>
+          ) : data.availableActions.length > 0 ? (
+            <div className="qtable-na-indicator">N/A</div>
+          ) : (
+            <div className="qtable-no-actions">✕</div>
+          )}
+        </div>
+        {isAgentHere && <div className="agent-indicator">📍</div>}
+      </div>
+    );
+  }, [qtableData, ncol, getCellType, getQValueColor, agentState, getActionDirection]);
+
+  // Render dragging agent overlay
   const renderDraggingAgent = useCallback(() => {
     if (!dragging) return null;
     
@@ -207,50 +385,58 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     );
   }, [dragging, mousePosition, cellSize]);
 
+  // Render game cell
   const renderCell = useCallback((row: number, col: number) => {
     const state = positionToState({ row, col });
     const cellType = getCellType(row, col);
     const isAgentHere = !dragging && agentState === state;
     const isDragTarget = dragging && dragPosition?.row === row && dragPosition?.col === col;
     
-    // Check if this is the agent's current position and has announced action
     const showAnnouncement = isAgentHere && announcedAction && announcedAction.action !== undefined;
+    const isAgentDisabled = isAgentHere && !isDragAllowed;
     
     return (
       <div
         key={`${row}-${col}`}
         className={`cell cell-${cellType.toLowerCase()} ${
           isAgentHere ? 'cell-with-agent' : ''
-        } ${isDragTarget ? 'cell-drag-target' : ''}`}
+        } ${isDragTarget ? 'cell-drag-target' : ''} ${
+          isAgentDisabled ? 'cell-disabled' : ''
+        }`}
         onMouseDown={(e) => handleMouseDown(e, state)}
         onClick={(e) => {
           const position = getAgentPosition(state);
           onCellClick?.(state, position);
         }}
-        title={`State: ${state}, Type: ${cellType}${
-          showAnnouncement ? `\n${getAnnouncementTooltip()}` : ''
-        }`}
+        // title={
+        //   isAgentDisabled 
+        //     ? getDisabledTooltip()
+        //     : `State: ${state}, Type: ${cellType}${
+        //         showAnnouncement ? `\n${getAnnouncementTooltip()}` : ''
+        //       }`
+        // }
         style={{ margin: 0, padding: 0 }}
       >
         <div className="cell-content">
           {isAgentHere && !dragging ? '🤖' : getCellEmoji(cellType)}
         </div>
         
-        {/* Action announcement indicator */}
         {showAnnouncement && (
           <div className={`action-announcement ${getActionColorClass(announcedAction.type)}`}>
             <div className="announcement-arrow">
               {getActionDirection(announcedAction.action)}
             </div>
-            <div className="announcement-type">
-              {announcedAction.type === 'exploration' ? '🔍' : '🎯'}
-            </div>
           </div>
         )}
         
-        {/* Drag target highlight */}
         {isDragTarget && (
           <div className="drag-target-overlay"></div>
+        )}
+        
+        {isAgentDisabled && (
+          <div className="disabled-overlay">
+            <div className="lock-icon">🔒</div>
+          </div>
         )}
       </div>
     );
@@ -267,27 +453,66 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
     announcedAction, 
     getAnnouncementTooltip, 
     getActionDirection, 
-    getActionColorClass 
+    getActionColorClass,
+    isDragAllowed,
+    getDisabledTooltip
   ]);
 
   return (
     <div 
-      className={`frozen-lake-board ${dragging ? 'dragging' : ''}`}
+      className={`frozen-lake-board ${dragging ? 'dragging' : ''} ${
+        !isDragAllowed ? 'board-disabled' : ''
+      }`}
       ref={boardRef}
       style={{ margin: 0, padding: 0 }}
     >
-      <div className="board-container" style={{ position: 'relative', margin: 0, padding: 0 }}>
-        {Array.from({ length: nrow }, (_, row) => (
-          <div key={row} className="grid-row" style={{ margin: 0, padding: 0 }}>
-            {Array.from({ length: ncol }, (_, col) => renderCell(row, col))}
+      <div className="board-container">
+        {/* Game Map Section */}
+        <div className="game-grid-section">
+          <div className="section-title">Game Map</div>
+          <div className="grid-container">
+            {Array.from({ length: nrow }, (_, row) => (
+              <div key={`game-row-${row}`} className="grid-row">
+                {Array.from({ length: ncol }, (_, col) => renderCell(row, col))}
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+        
+        {/* Q-table Visualization Section */}
+        {qtable && qtableData && shouldShowQTable && (
+          <div className="qtable-section">
+            <div className="section-title">Current best actions in each square for the agent</div>
+            <div className="qtable-grid">
+              {Array.from({ length: nrow }, (_, row) => (
+                <div key={`qtable-row-${row}`} className="qtable-row">
+                  {Array.from({ length: ncol }, (_, col) => renderQTableCell(row, col))}
+                </div>
+              ))}
+            </div>
+             <div className="qtable-legends">
+              <div className="gradient-legend">
+                <div className="legend-title">Heatmap regarding the belief strength:</div>
+                <div className="gradient-bar">
+                  <div className="gradient-fill"></div>
+                </div>
+                <div className="legend-labels">
+                  <span className="legend-label">Weak</span>
+                  <span className="legend-label">Strong</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+        
         {renderDraggingAgent()}
       </div>
       
+      {/* Drag hint message */}
       {dragging && (
         <div className="drag-hint">
-          🎯 Drag agent to target position for intervention
+          Drag agent to the desired position and release it for intervention
           {dragPosition && (
             <span className="position-info">
               Position: ({dragPosition.row}, {dragPosition.col})
@@ -295,6 +520,16 @@ export const FrozenLakeBoard: React.FC<FrozenLakeBoardProps> = ({
           )}
         </div>
       )}
+      
+      {/* Disabled state hint */}
+      {/* {!isDragAllowed && !dragging && (
+        <div className="disabled-hint">
+          {!isGameRunning ? 'Start game to move agent' :
+           isGamePaused ? 'Game is paused - resume to move agent' :
+           isIntervening ? 'Intervention in progress - please wait' :
+           'Ready to move agent'}
+        </div>
+      )} */}
     </div>
   );
 };

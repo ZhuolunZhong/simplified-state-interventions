@@ -75,7 +75,6 @@
   z-index: 2;
 }
 
-/* Action announcement styles - 恢复到气泡设计 */
 .action-announcement {
   position: absolute;
   top: -10px;
@@ -126,44 +125,22 @@
   opacity: 0.9;
 }
 
-/* Exploration style - Orange theme */
-.action-exploration {
-  border: 3px solid #f59e0b;
-}
-
-.action-exploration .announcement-arrow {
-  color: #d97706;
-}
-
-.action-exploration .announcement-type {
-  color: #d97706;
-}
-
-.action-exploration::before {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  right: 2px;
-  bottom: 2px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(255, 247, 237, 0.9), rgba(254, 215, 170, 0.7));
-  z-index: -1;
-}
-
-/* Exploitation style - Green theme */
+.action-exploration,
 .action-exploitation {
   border: 3px solid #10b981;
 }
 
+.action-exploration .announcement-arrow,
 .action-exploitation .announcement-arrow {
   color: #059669;
 }
 
+.action-exploration .announcement-type,
 .action-exploitation .announcement-type {
   color: #059669;
 }
 
+.action-exploration::before,
 .action-exploitation::before {
   content: '';
   position: absolute;
@@ -176,7 +153,6 @@
   z-index: -1;
 }
 
-/* Hover effects */
 .cell-with-agent:hover .action-announcement {
   transform: scale(1.25);
   z-index: 10;
@@ -187,13 +163,11 @@
   z-index: 3;
 }
 
-/* Special cells */
 .cell-hole .action-announcement,
 .cell-goal .action-announcement {
   filter: drop-shadow(0 0 3px rgba(255,255,255,0.8));
 }
 
-/* Drag and drop styles */
 .dragging-agent {
   position: fixed;
   width: 60px;
@@ -256,7 +230,6 @@
   white-space: nowrap;
 }
 
-/* Responsive styles */
 @media (max-width: 768px) {
   .action-announcement {
     width: 28px;
@@ -322,5 +295,388 @@
     width: 40px;
     height: 40px;
     font-size: 18px;
+  }
+}
+
+.cell-with-agent.disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.disabled-hint {
+  position: absolute;
+  bottom: -30px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+}
+
+.qtable-section {
+  margin-top: 20px;
+  width: fit-content;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.qtable-section .section-title {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+}
+
+.qtable-stats {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+  text-align: center;
+  padding: 4px 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.qtable-grid {
+  display: block;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f9f9f9;
+  width: fit-content;
+}
+
+.qtable-row {
+  display: block;
+  margin: 0;
+  padding: 0;
+  height: 60px;
+}
+
+.qtable-cell {
+  width: 60px;
+  height: 60px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ddd;
+  position: relative;
+  cursor: default;
+  font-size: 12px;
+  user-select: none;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  vertical-align: top;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.qtable-cell:hover {
+  transform: scale(1.05);
+  z-index: 1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.qtable-cell-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 2;
+  gap: 2px;
+}
+
+.qtable-action-arrow {
+  font-size: 35px; 
+  font-weight: bold;
+  line-height: 1;
+  color: white; 
+  text-shadow: 
+    0px 0px 3px rgba(0, 0, 0, 0.8), 
+    1px 1px 0 rgba(0, 0, 0, 0.6),
+    -1px -1px 0 rgba(0, 0, 0, 0.2);
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.5)); 
+}
+
+.qtable-value {
+  font-size: 10px;
+  font-weight: 600;
+  color: #222;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 2px 4px;
+  border-radius: 3px;
+  min-width: 28px;
+  text-align: center;
+  line-height: 1;
+}
+
+.terminal-cell {
+  background: linear-gradient(135deg, #f5f5f5, #e0e0e0);
+  color: #666;
+  font-size: 20px;
+}
+
+.hole-cell {
+  background: linear-gradient(135deg, #ffcdd2, #ef9a9a);
+}
+
+.goal-cell {
+  background: linear-gradient(135deg, #c8e6c9, #a5d6a7);
+}
+
+.agent-cell {
+  border: 3px solid #2196f3;
+  box-shadow: 0 0 10px rgba(33, 150, 243, 0.5);
+}
+
+.no-actions {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.05),
+    rgba(0, 0, 0, 0.05) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+.agent-indicator {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 12px;
+  animation: agent-pulse 1.5s infinite;
+}
+
+@keyframes agent-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.board-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.game-grid-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: fit-content;
+}
+
+.game-grid-section .section-title {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .qtable-cell {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .qtable-row {
+    height: 50px;
+  }
+  
+  .qtable-action-arrow {
+    font-size: 16px;
+  }
+  
+  .qtable-value {
+    font-size: 9px;
+    padding: 1px 3px;
+    min-width: 24px;
+  }
+  
+  .terminal-cell {
+    font-size: 18px;
+  }
+  
+  .agent-indicator {
+    font-size: 10px;
+    top: -4px;
+    right: -4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .qtable-cell {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .qtable-row {
+    height: 40px;
+  }
+  
+  .qtable-action-arrow {
+    font-size: 14px;
+  }
+  
+  .qtable-value {
+    font-size: 8px;
+    padding: 1px 2px;
+    min-width: 20px;
+  }
+  
+  .terminal-cell {
+    font-size: 16px;
+  }
+  
+  .agent-indicator {
+    font-size: 8px;
+    top: -3px;
+    right: -3px;
+  }
+}
+
+.frozen-lake-board {
+  position: relative;
+  padding-bottom: 0;
+}
+
+.drag-hint {
+  position: absolute;
+  bottom: -50px;
+}
+
+.disabled-hint {
+  position: absolute;
+  bottom: -30px;
+}
+
+.frozen-lake-board:has(.qtable-section) .drag-hint {
+  bottom: -80px;
+}
+
+.frozen-lake-board:has(.qtable-section) .disabled-hint {
+  bottom: -60px;
+}
+
+.qtable-legends {
+  margin-top: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  align-items: flex-start;
+}
+
+.gradient-legend {
+  flex: 1;
+  min-width: 250px;
+  padding: 12px;
+  background-color: rgba(240, 240, 240, 0.8);
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.gradient-legend .legend-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #333;
+  font-size: 14px;
+}
+
+.gradient-bar {
+  width: 100%;
+  height: 20px;
+  background: linear-gradient(to right, 
+    hsl(120, 60%, 85%),    
+    hsl(120, 60%, 70%),    
+    hsl(120, 60%, 55%),    
+    hsl(120, 60%, 40%),   
+    hsl(120, 60%, 25%)
+  );
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  margin-bottom: 5px;
+}
+
+.gradient-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+  color: #000000;
+}
+
+@media (max-width: 768px) {
+  .qtable-legends {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .gradient-legend{
+    width: 100%;
+  }
+}
+
+.qtable-na-indicator {
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  text-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80%;
+  height: 60%;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.qtable-no-actions {
+  font-size: 24px;
+  font-weight: bold;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 768px) {
+  .qtable-na-indicator {
+    font-size: 12px;
+    padding: 3px 6px;
+  }
+  
+  .qtable-no-actions {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .qtable-na-indicator {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+  
+  .qtable-no-actions {
+    font-size: 16px;
   }
 }

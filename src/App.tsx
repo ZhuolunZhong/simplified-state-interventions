@@ -1,5 +1,6 @@
 // src/App.tsx
 import React, { useState } from 'react';
+import { ConsentPage } from './pages/ConsentPage';
 import { TrainingPage } from './pages/TrainingPage';
 import { IntroductionPage } from './pages/IntroductionPage';
 import { ResultsPage } from './pages/ResultsPage';
@@ -7,7 +8,7 @@ import { ExperimentPhase } from './types';
 import './App.css';
 
 const App: React.FC = () => {
-  const [currentPhase, setCurrentPhase] = useState<ExperimentPhase>('introduction');
+  const [currentPhase, setCurrentPhase] = useState<ExperimentPhase>('consent');
   const [experimentData, setExperimentData] = useState<any>(null);
   const [hasExperimentData, setHasExperimentData] = useState(false);
 
@@ -22,7 +23,6 @@ const App: React.FC = () => {
 
   // Navigation click handler
   const handleNavClick = (targetPhase: ExperimentPhase) => {
-    // Prevent jumping to results page without data
     if (targetPhase === 'results' && !hasExperimentData && currentPhase !== 'results') {
       alert('Please complete training first and click "View Training Results" to generate experiment data');
       return;
@@ -34,6 +34,12 @@ const App: React.FC = () => {
   // Render current page
   const renderCurrentPage = () => {
     switch (currentPhase) {
+      case 'consent':
+        return (
+          <ConsentPage 
+            onNextPhase={() => handlePhaseChange('introduction')}
+          />
+        );
       case 'introduction':
         return (
           <IntroductionPage 
@@ -53,23 +59,23 @@ const App: React.FC = () => {
             onRestart={() => {
               setHasExperimentData(false);
               setExperimentData(null);
-              handlePhaseChange('introduction');
+              handlePhaseChange('consent');
             }}
           />
         );
       default:
-        return <IntroductionPage onNextPhase={() => handlePhaseChange('training')} />;
+        return <ConsentPage onNextPhase={() => handlePhaseChange('introduction')} />;
     }
   };
 
   // Render navigation
   const renderNavigation = () => {
-    if (currentPhase === 'introduction') return null;
+    if (currentPhase === 'consent' || currentPhase === 'introduction') return null;
 
     return (
       <nav className="app-navigation">
         <div className="nav-brand">
-          <h1>❄️ Frozen Lake Experiment Platform</h1>
+          <h1>Experiment Platform</h1>
         </div>
         <div className="nav-links">
           <button 
@@ -104,13 +110,14 @@ const App: React.FC = () => {
       <main className="app-main">
         {renderCurrentPage()}
       </main>
-      <footer className="app-footer">
+      {/* <footer className="app-footer">
         <div className="footer-content">
           <p>Reinforcement Learning Human Intervention Research Platform - Based on Q-learning Algorithm</p>
           <div className="footer-links">
             <span>Current Phase: 
               <span className="phase-tag">
-                {currentPhase === 'introduction' ? 'Experiment Introduction' :
+                {currentPhase === 'consent' ? 'Consent Form' :
+                 currentPhase === 'introduction' ? 'Experiment Introduction' :
                  currentPhase === 'training' ? 'Model Training' : 'Results Analysis'}
                 {currentPhase === 'results' && !hasExperimentData && " (No Data)"}
               </span>
@@ -118,7 +125,7 @@ const App: React.FC = () => {
             {hasExperimentData && <span className="data-available">📊 Experiment Data Ready</span>}
           </div>
         </div>
-      </footer>
+      </footer> */}
     </div>
   );
 };

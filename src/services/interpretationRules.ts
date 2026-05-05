@@ -14,25 +14,28 @@ export const suggestionRule: InterventionFunction = (
   
   let actionToUpdate: Action;
 
-  const isOneDimensional = nrow === 1;
+  const isOneDimensional = nrow === 1 || ncol === 1;
   
   if (isOneDimensional) {
-    // One-dimensional map: only consider horizontal movement
-    const colDiff = newPos.col - oldPos.col;
-    actionToUpdate = colDiff > 0 ? 2 : 0; // Right : Left
-    console.log(`1D Map: State ${state}->${newState}, ColDiff: ${colDiff}, Action: ${actionToUpdate}`);
+    if (nrow === 1) {
+      // Horizontal 1D map: only consider column difference
+      const colDiff = newPos.col - oldPos.col;
+      actionToUpdate = colDiff > 0 ? 2 : 0; // Right : Left
+    } else {
+      // Vertical 1D map: only consider row difference  
+      const rowDiff = newPos.row - oldPos.row;
+      actionToUpdate = rowDiff > 0 ? 1 : 3; // Down : Up
+    }
   } else {
-    // Multi-dimensional map: consider both horizontal and vertical movement
+    // 2D map: consider both horizontal and vertical movement
     const rowDiff = newPos.row - oldPos.row;
     const colDiff = newPos.col - oldPos.col;
     
-    // Prioritize the direction with larger absolute difference
     if (Math.abs(colDiff) > Math.abs(rowDiff)) {
       actionToUpdate = colDiff > 0 ? 2 : 0; // Right : Left
     } else {
       actionToUpdate = rowDiff > 0 ? 1 : 3; // Down : Up
     }
-    console.log(`2D Map: State ${state}->${newState}, RowDiff: ${rowDiff}, ColDiff: ${colDiff}, Action: ${actionToUpdate}`);
   }
   
   const currentQ = updatedQTable[state][actionToUpdate];

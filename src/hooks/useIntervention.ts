@@ -18,7 +18,9 @@ export const useIntervention = ({
   learningRate,
   gamma,
   onInterventionApplied,
-  learningParams 
+  learningParams,
+  currentRound,      
+  currentEpisode    
 }: UseInterventionProps & { learningParams: any }) => { 
   // ==================== State Definitions ====================
   const [interventionRule, setInterventionRule] = useState<InterventionRule>('suggestion');
@@ -112,7 +114,9 @@ export const useIntervention = ({
         rule: interventionRule,
         reward,
         action: intendedAction,
-        actionType: actionInfo.type
+        actionType: actionInfo.type,
+        round: currentRound,      
+        episode: currentEpisode
       };
 
       // Update history
@@ -123,16 +127,6 @@ export const useIntervention = ({
 
       // Trigger callback
       onInterventionApplied?.(interventionRecord);
-
-      console.log(`Intervention applied: ${interventionRule} rule`, {
-        fromState,
-        toState,
-        reward,
-        intendedAction,
-        actionType: actionInfo.type,
-        learningRate,
-        mapDimensions: `${learningParams.nrow}×${learningParams.ncol}` 
-      });
 
     } catch (error) {
       console.error('Error applying intervention:', error);

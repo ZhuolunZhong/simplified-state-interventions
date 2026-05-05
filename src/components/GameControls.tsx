@@ -1,7 +1,21 @@
 // src/components/GameControls.tsx
-import React, { useEffect } from 'react'; // Added useEffect import
+import React, { useEffect } from 'react';
 import { GameControlsProps, InterventionRule } from '../types';
 import './GameControls.css';
+
+const RULE_DESCRIPTIONS: Record<InterventionRule, string> = {
+  suggestion: 'Update Q-value based on movement direction',
+  reset: 'Update Q-value using target state reward', 
+  interrupt: 'Ignore current timestep',
+  impede: 'Apply negative reward to original action'
+};
+
+const RULE_LABELS: Record<InterventionRule, string> = {
+  suggestion: 'Suggestion Rule',
+  reset: 'Reset Rule',
+  interrupt: 'Interrupt Rule',
+  impede: 'Impede Rule'
+};
 
 export const GameControls: React.FC<GameControlsProps> = ({
   isRunning,
@@ -16,34 +30,8 @@ export const GameControls: React.FC<GameControlsProps> = ({
   agentStepDelay, 
   onStepDelayChange 
 }) => {
-  // Intervention rule options
-  const interventionRules: { value: InterventionRule; label: string; description: string }[] = [
-    {
-      value: 'suggestion',
-      label: 'Suggestion Rule',
-      description: 'Update Q-value based on movement direction'
-    },
-    {
-      value: 'reset',
-      label: 'Reset Rule', 
-      description: 'Update Q-value using target state reward'
-    },
-    {
-      value: 'interrupt',
-      label: 'Interrupt Rule',
-      description: 'Ignore current timestep'
-    },
-    {
-      value: 'impede',
-      label: 'Impede Rule',
-      description: 'Apply negative reward to original action'
-    }
-  ];
-
-  // Keyboard shortcut support
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      // Only trigger when no form element has focus
       if (event.target instanceof HTMLInputElement || 
           event.target instanceof HTMLSelectElement || 
           event.target instanceof HTMLTextAreaElement) {
@@ -51,40 +39,37 @@ export const GameControls: React.FC<GameControlsProps> = ({
       }
 
       switch (event.key) {
-        case ' ': // Spacebar - Pause/Resume
+        case ' ':
           event.preventDefault();
           if (isRunning && !isPaused) {
-            // Running → Pause
             onPause();
           } else if (isRunning && isPaused) {
-            // Paused → Resume
             onStart();
           } else {
-            // Stopped → Start
             onStart();
           }
           break;
         
-        case 'r': // R key - Reset
-        case 'R':
-          event.preventDefault();
-          onReset();
-          break;
+        // case 'r':
+        // case 'R':
+        //   event.preventDefault();
+        //   onReset();
+        //   break;
         
-        case 's': // S key - Single step
-        case 'S':
-          event.preventDefault();
-          if (!isRunning || isPaused) {
-            onStep();
-          }
-          break;
+        // case 's':
+        // case 'S':
+        //   event.preventDefault();
+        //   if (!isRunning || isPaused) {
+        //     onStep();
+        //   }
+        //   break;
           
-        case 'Escape': // ESC key - Stop
-          event.preventDefault();
-          if (isRunning) {
-            onPause();
-          }
-          break;
+        // case 'Escape':
+        //   event.preventDefault();
+        //   if (isRunning) {
+        //     onPause();
+        //   }
+        //   break;
       }
     };
 
@@ -92,26 +77,16 @@ export const GameControls: React.FC<GameControlsProps> = ({
     return () => document.removeEventListener('keydown', handleKeyPress);
   }, [isRunning, isPaused, onStart, onPause, onReset, onStep]);
 
-  // Handle rule change
-  const handleRuleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    onRuleChange(event.target.value as InterventionRule);
+  const handleSliderChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const sliderValue = parseInt(event.target.value, 10);
+    const actualDelay = 2100 - sliderValue;
+    onStepDelayChange(actualDelay);
   };
 
-  // Get current rule description
-  const getCurrentRuleDescription = () => {
-    const currentRule = interventionRules.find(rule => rule.value === interventionRule);
-    return currentRule?.description || '';
-  };
-
-  // handle step delay change
-  const handleStepDelayChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newDelay = parseInt(event.target.value, 10);
-    onStepDelayChange(newDelay);
-  };
+  const sliderValue = 2100 - agentStepDelay;
 
   return (
     <div className="game-controls">
-      {/* Main control area */}
       <div className="control-section">
         <h3>Game Controls</h3>
         <div className="control-buttons">
@@ -141,33 +116,32 @@ export const GameControls: React.FC<GameControlsProps> = ({
             </button>
           )}
           
-          <button
+          {/* <button
             className="control-button step-button"
             onClick={onStep}
             disabled={isRunning && !isPaused}
             title="Single step (S key)"
           >
             ⏭️ Step
-          </button>
+          </button> */}
           
-          <button
+          {/* <button
             className="control-button reset-button"
             onClick={onReset}
             title="Reset game (R key)"
           >
             🔄 Reset
-          </button>
+          </button> */}
         </div>
       </div>
 
-      {/* step delay selection area */}
-      <div className="control-section">
+      {/* <div className="control-section">
         <h3>Agent's moving speed</h3>
         <div className="speed-control">
           <div className="speed-labels">
-            <span>fast</span>
-            <span className="current-speed">{(agentStepDelay / 1000).toFixed(1)}s/step</span>
             <span>slow</span>
+            <span className="current-speed">{(agentStepDelay / 1000).toFixed(1)}s/step</span>
+            <span>fast</span>
           </div>
           <input
             type="range"
@@ -175,8 +149,8 @@ export const GameControls: React.FC<GameControlsProps> = ({
             min="100"
             max="2000"
             step="100"
-            value={agentStepDelay}
-            onChange={handleStepDelayChange}
+            value={sliderValue}
+            onChange={handleSliderChange}
             title={`Adjust the movement speed of the agent: ${agentStepDelay}ms`}
           />
           <div className="speed-presets">
@@ -210,48 +184,21 @@ export const GameControls: React.FC<GameControlsProps> = ({
             </button>
           </div>
         </div>
-      </div>
+      </div> */}
 
-      {/* Intervention rule selection area */}
-      <div className="control-section">
-        <h3>Intervention Rules</h3>
-        <div className="rule-selection">
-          <select
-            className="rule-select"
-            value={interventionRule}
-            onChange={handleRuleChange}
-            title="Select intervention rule"
-          >
-            {interventionRules.map(rule => (
-              <option key={rule.value} value={rule.value}>
-                {rule.label}
-              </option>
-            ))}
-          </select>
-          
+      {/* <div className="control-section">
+        <h3>Assigned Intervention Rule</h3>
+        <div className="rule-display">
+          <div className="rule-name">{RULE_LABELS[interventionRule]}</div>
           <div className="rule-description">
-            {getCurrentRuleDescription()}
+            {RULE_DESCRIPTIONS[interventionRule]}
+          </div>
+          <div className="rule-note">
+            This rule is assigned based on your Participant ID and cannot be changed.
           </div>
         </div>
-        
-        {/* Rule quick selection buttons */}
-        <div className="rule-quick-buttons">
-          {interventionRules.map(rule => (
-            <button
-              key={rule.value}
-              className={`rule-quick-button ${
-                interventionRule === rule.value ? 'active' : ''
-              }`}
-              onClick={() => onRuleChange(rule.value)}
-              title={rule.description}
-            >
-              {rule.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      </div> */}
 
-      {/* Status indicators */}
       <div className="control-section">
         <h3>Status Indicators</h3>
         <div className="status-indicators">
@@ -267,25 +214,24 @@ export const GameControls: React.FC<GameControlsProps> = ({
             </span>
           </div>
           
-          <div className="status-item">
+          {/* <div className="status-item">
             <span className="status-label">Intervention Rule:</span>
             <span className="status-value rule-indicator">
-              {interventionRules.find(r => r.value === interventionRule)?.label}
+              {RULE_LABELS[interventionRule]}
             </span>
-          </div>
+          </div> */}
         </div>
       </div>
 
-      {/* Operation hints - Updated to include shortcuts */}
       <div className="control-section hints">
         <h4>Operation Hints</h4>
         <ul className="hints-list">
           <li>🎯 <strong>Spacebar</strong> - Start/Pause training</li>
           <li>🖱️ Drag agent on map for intervention</li>
-          <li>🐢 <strong>drag the slider</strong> - adjust the agent speed</li>
-          <li>⚡ <strong>S key</strong> - Single step execution</li>
-          <li>🔄 <strong>R key</strong> - Reset game</li>
-          <li>ESC - Stop training</li>
+          {/* <li>🐢 <strong>drag the slider</strong> - adjust the agent speed</li> */}
+          {/* <li>⚡ <strong>S key</strong> - Single step execution</li> */}
+          {/* <li>🔄 <strong>R key</strong> - Reset game</li> */}
+          {/* <li>ESC - Stop training</li> */}
         </ul>
       </div>
     </div>

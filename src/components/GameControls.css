@@ -1,4 +1,4 @@
-/* src/components/GameControls.css */
+/* src/components/GameControls.css*/
 .game-controls {
   display: flex;
   flex-direction: column;
@@ -103,64 +103,38 @@
   background: linear-gradient(135deg, #7f8c8d, #636e72);
 }
 
-.rule-selection {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.rule-select {
-  padding: 0.75rem;
-  border: 2px solid #bdc3c7;
+.rule-display {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
   border-radius: 8px;
-  font-size: 0.9rem;
-  background: white;
-  cursor: pointer;
-  transition: border-color 0.3s ease;
+  padding: 1rem;
+  margin-bottom: 1rem;
 }
 
-.rule-select:focus {
-  outline: none;
-  border-color: #3498db;
-  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+.rule-name {
+  font-weight: bold;
+  color: #212529;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
 }
 
 .rule-description {
-  font-size: 0.8rem;
-  color: #7f8c8d;
-  font-style: italic;
+  font-size: 0.9rem;
+  color: #495057;
+  line-height: 1.4;
   padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.8);
   border-radius: 4px;
   border-left: 3px solid #3498db;
 }
 
-.rule-quick-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-}
-
-.rule-quick-button {
-  padding: 0.5rem 0.75rem;
-  border: 2px solid #bdc3c7;
-  border-radius: 6px;
-  background: white;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.rule-quick-button:hover {
-  border-color: #3498db;
-  background: #ecf0f1;
-}
-
-.rule-quick-button.active {
-  border-color: #e74c3c;
-  background: #e74c3c;
-  color: white;
-  font-weight: 500;
+.rule-note {
+  font-size: 0.85rem;
+  color: #868e96;
+  margin-top: 0.75rem;
+  font-style: italic;
+  border-top: 1px dashed #dee2e6;
+  padding-top: 0.5rem;
 }
 
 .status-indicators {
@@ -235,10 +209,6 @@
     flex-direction: column;
   }
   
-  .rule-quick-buttons {
-    grid-template-columns: 1fr;
-  }
-  
   .control-button {
     min-width: auto;
   }
@@ -289,7 +259,7 @@
 .current-speed {
   font-weight: 600;
   color: #007acc;
-  background: white;
+  background: #e7f5ff;
   padding: 0.25rem 0.75rem;
   border-radius: 4px;
   border: 1px solid #007acc;
@@ -338,16 +308,18 @@
 .speed-preset {
   padding: 0.5rem;
   border: 1px solid #dee2e6;
-  background: white;
+  background: #e9ecef;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.85rem;
   transition: all 0.2s;
+  color: #495057;
 }
 
 .speed-preset:hover {
-  background: #f8f9fa;
+  background: #dee2e6;
   transform: translateY(-1px);
+  color: #212529;
 }
 
 .speed-preset.active {
@@ -367,4 +339,17 @@
     gap: 0.5rem;
     align-items: flex-start;
   }
+}
+
+.game-controls .control-section .rule-display .rule-name {
+  color: #212529 !important;
+  background: #f8f9fa !important;
+  font-weight: 700 !important;
+  font-size: 1.1rem !important;
+  margin-bottom: 0.5rem !important;
+  opacity: 1 !important;
+  display: inline-block !important;
+  padding: 0.25rem 0.75rem !important;
+  border-radius: 4px !important;
+  border-left: 3px solid #3498db !important;
 }

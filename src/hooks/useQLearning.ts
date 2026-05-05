@@ -128,6 +128,12 @@ export const useQLearning = ({
 
   // ==================== Q-learning Core Functions ====================
   const chooseAction = useCallback((state: number): Action => {
+    const cached = actionHistoryRef.current.get(state);
+    if (cached && cached.valid) {
+      console.log('Using cached action for state', state);
+      return cached.action; 
+    }
+
     const { epsilon } = learningParams;
     const availableActions = getAvailableActions(state);
 
@@ -159,7 +165,8 @@ export const useQLearning = ({
       type,
       randomValue,
       state,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      valid: true
     };
     
     setCurrentActionInfo(actionInfo);
@@ -167,6 +174,16 @@ export const useQLearning = ({
 
     return action;
   }, [learningParams, getAvailableActions, getBestActionFromAvailable]);
+
+  const markActionAsExecuted = useCallback((state: number) => {
+    const actionInfo = actionHistoryRef.current.get(state);
+    if (actionInfo) {
+      actionHistoryRef.current.set(state, { 
+        ...actionInfo, 
+        valid: false 
+      });
+    }
+  }, []);
 
   const updateQValue = useCallback((
     state: number, 
@@ -347,6 +364,7 @@ export const useQLearning = ({
     updateQValue,
     updateQTable,
     resetQTable,
+    markActionAsExecuted,
     
     // Announcement system
     getAnnouncedAction,

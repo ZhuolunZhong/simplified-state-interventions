@@ -96,12 +96,30 @@
   font-size: 1rem;
 }
 
+.availability-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 0.6rem;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 1px 3px;
+  border-radius: 2px;
+  color: #495057;
+  font-weight: bold;
+}
+
 .qtable-legend {
   background: white;
   padding: 1rem;
   border-radius: 4px;
   border: 1px solid #dee2e6;
   min-width: 200px;
+  color: #212529;
+}
+
+.qtable-legend h4 {
+  color: #212529;
+  margin: 0 0 1rem 0;
 }
 
 .legend-gradient {
@@ -109,6 +127,7 @@
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
+  color: #212529;
 }
 
 .gradient-bar {
@@ -128,6 +147,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  color: #212529;
 }
 
 .legend-color {
@@ -138,12 +158,23 @@
   justify-content: center;
 }
 
+.legend-color.terminal-hole,
+.legend-color.terminal-goal {
+  font-size: 1rem;
+}
+
 .detailed-view {
   margin-top: 1rem;
   padding: 1rem;
   background: white;
   border-radius: 4px;
   border: 1px solid #dee2e6;
+  color: #212529;
+}
+
+.detailed-view h4 {
+  color: #212529;
+  margin: 0 0 1rem 0;
 }
 
 .q-value-details {
@@ -159,6 +190,11 @@
   padding: 0.5rem;
   background: #f8f9fa;
   border-radius: 4px;
+  color: #212529;
+}
+
+.action-label {
+  color: #212529;
 }
 
 .action-direction {
@@ -166,12 +202,14 @@
   font-weight: bold;
   width: 20px;
   text-align: center;
+  color: #212529;
 }
 
 .q-value-number {
   margin-left: auto;
   font-family: 'Courier New', monospace;
   font-weight: bold;
+  color: #212529;
 }
 
 .action-q-value.unavailable {
@@ -180,6 +218,14 @@
 }
 
 .action-q-value.unavailable .action-direction {
+  color: #6c757d;
+}
+
+.action-q-value.unavailable .action-label {
+  color: #6c757d;
+}
+
+.action-q-value.unavailable .q-value-number {
   color: #6c757d;
 }
 
@@ -193,8 +239,17 @@
   background: #e9ecef !important;
 }
 
+.qtable-cell.no-actions .qtable-cell-content {
+  color: #495057;
+  text-shadow: none;
+}
+
 .qtable-cell.no-actions .action-arrow {
-  color: #6c757d;
+  color: #495057;
+}
+
+.qtable-cell.no-actions .q-value {
+  color: #495057;
 }
 
 .legend-color.unavailable-action {
@@ -214,5 +269,18 @@
   background: #f8f9fa;
   border-radius: 4px;
   font-size: 0.9rem;
-  color: #6c757d;
+  color: #495057;
+}
+
+.availability-summary p {
+  margin: 0;
+}
+
+.terminal-hole .terminal-content,
+.terminal-goal .terminal-content {
+  color: #000;
+}
+
+.qtable-cell.terminal .terminal-content {
+  color: #000;
 }

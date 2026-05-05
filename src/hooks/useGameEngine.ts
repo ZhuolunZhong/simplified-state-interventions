@@ -13,25 +13,34 @@ import {
 
 export const useGameEngine = ({ 
   config, 
-  chooseAction,       
+  chooseAction,
+  markActionAsExecuted,
   updateQValue, 
   applyIntervention,
   onStep, 
   onEpisodeEnd,
-  onIntervention 
-}: UseGameEngineProps) => {
-  // ==================== State Definitions ====================
+  onIntervention,
+  onRoundEnd,
+  onExperimentEnd,
+  resetQTable
+}: UseGameEngineProps & {
+  onRoundEnd?: (roundNumber: number) => void;
+  onExperimentEnd?: (totalEpisodes: number) => void;
+}) => {
+  // Initial agent state from map configuration
   const startState = getStartState(config.mapDesc); 
 
+  // Agent's current state and statistics
   const [agentState, setAgentState] = useState<AgentState>({
     currentState: startState, 
     totalReward: 0,
     steps: 0,
     lastReward: 0,
     isDone: false,
-    nextAction: null, // 新增：存储即将执行的动作
+    nextAction: null,
   });
 
+  // Game control status flags
   const [gameStatus, setGameStatus] = useState<GameStatus>({
     isRunning: false,
     isPaused: false,
@@ -39,60 +48,56 @@ export const useGameEngine = ({
     isTraining: true
   });
 
+  // Game statistics tracking
   const [gameStats, setGameStats] = useState<GameStats>({
-    episode: 0,
-    totalReward: 0,  
-    steps: 0,        
+    episode: 1,
+    totalReward: 0,
+    steps: 0,
     lastReward: 0,
     interventions: 0,
-    successRate: 0
+    successRate: 0,
+    currentRound: 1
   });
 
+  // Dragging state for manual agent movement
   const [isDragging, setIsDragging] = useState(false);
 
-  // ==================== Ref Definitions ====================
+  // Refs for game loop and timing control
   const gameLoopRef = useRef<number | null>(null);
   const lastStepTimeRef = useRef<number>(0);
+  
+  // Episode-specific statistics
   const episodeStatsRef = useRef({
-    episodeReward: 0,    
-    episodeSteps: 0,     
+    episodeReward: 0,
+    episodeSteps: 0,
     episodeInterventions: 0
   });
 
-  const successCountRef = useRef(0); 
+  // Success tracking for success rate calculation
+  const successCountRef = useRef(0);
   
+  // Round configuration
+  const roundConfigRef = useRef({
+    totalRounds: 5,
+    episodesPerRound: 15
+  });
+  
+  // Refs for frequently accessed states to avoid re-renders
   const agentStateRef = useRef(agentState);
   const gameStatusRef = useRef(gameStatus);
   const gameStatsRef = useRef(gameStats);
 
-  // Store the action that will be executed
+  // Track current episode number to prevent duplicate calls
+  const currentEpisodeKeyRef = useRef<string>('');
+
+  // Pending action to be executed in game loop
   const pendingActionRef = useRef<{
     state: number;
     action: Action;
     timestamp: number;
   } | null>(null);
 
-  // Synchronize refs with state
-  useEffect(() => {
-    agentStateRef.current = agentState;
-  }, [agentState]);
-
-  useEffect(() => {
-    gameStatusRef.current = gameStatus;
-  }, [gameStatus]);
-
-  useEffect(() => {
-    gameStatsRef.current = gameStats;
-  }, [gameStats]);
-
-  // Initialize: select first action when game starts
-  useEffect(() => {
-    if (gameStatus.isRunning && !gameStatus.isPaused && !agentState.isDone) {
-      selectNextAction(agentState.currentState);
-    }
-  }, [gameStatus.isRunning, gameStatus.isPaused, agentState.isDone]);
-
-  // ==================== Utility Functions ====================
+  // Convert state index to grid position
   const getAgentPosition = useCallback((state: number): Position => {
     const ncol = config.mapDesc[0].length;
     return {
@@ -101,41 +106,91 @@ export const useGameEngine = ({
     };
   }, [config.mapDesc]);
 
+  // Convert grid position to state index
   const positionToState = useCallback((position: Position): number => {
     const ncol = config.mapDesc[0].length;
     return position.row * ncol + position.col;
   }, [config.mapDesc]);
 
+  // Check if state is terminal (hole or goal)
   const isTerminalState = useCallback((state: number): boolean => {
     const { row, col } = getAgentPosition(state);
     const cellType = config.mapDesc[row][col];
     return cellType === 'H' || cellType === 'G';
   }, [config.mapDesc, getAgentPosition]);
 
+  // Calculate reward based on cell type
   const calculateReward = useCallback((state: number): number => {
     const { row, col } = getAgentPosition(state);
     const cellType = config.mapDesc[row][col];
     
     switch (cellType) {
-      case 'H': // Hole
+      case 'H':
         return config.rewardSchedule[0];
-      case 'G': // Goal
+      case 'G':
         return config.rewardSchedule[1];
-      case 'S': // Start
-      case 'F': // Frozen
+      case 'S':
+      case 'F':
       default:
         return config.rewardSchedule[2];
     }
   }, [config.mapDesc, config.rewardSchedule, getAgentPosition]);
 
-  // ==================== Core Action Functions ====================
-  /**
-   * Select next action for the given state
-   * This generates the announcement for UI and stores the action for execution
-   */
+  // Reset round statistics and prepare for new round
+  const prepareNewRound = useCallback(() => {
+    const newRound = gameStats.currentRound + 1;
+    
+    // Check if all rounds completed
+    if (newRound > roundConfigRef.current.totalRounds) {
+      onExperimentEnd?.(gameStats.episode);
+      return;
+    }
+
+    // Reset game statistics for new round
+    setGameStats({
+      episode: 1,
+      totalReward: 0,
+      steps: 0,
+      lastReward: 0,
+      interventions: 0,
+      successRate: 0,
+      currentRound: newRound
+    });
+
+    // Reset agent to start position
+    setAgentState({
+      currentState: startState,
+      totalReward: 0,
+      steps: 0,
+      lastReward: 0,
+      isDone: false,
+      nextAction: null
+    });
+
+    // Reset episode statistics
+    episodeStatsRef.current = {
+      episodeReward: 0,
+      episodeSteps: 0,
+      episodeInterventions: 0
+    };
+
+    successCountRef.current = 0;
+    currentEpisodeKeyRef.current = '';
+
+    // Ensure game is stopped
+    if (gameStatus.isRunning) {
+      setGameStatus(prev => ({
+        ...prev,
+        isRunning: false,
+        isPaused: false
+      }));
+    }
+
+  }, [gameStats.currentRound, gameStats.episode, gameStatus.isRunning, startState, onExperimentEnd]);
+
+  // Select next action using Q-learning policy
   const selectNextAction = useCallback((state: number) => {
     if (isTerminalState(state)) {
-      // Terminal states don't have next actions
       setAgentState(prev => ({ ...prev, nextAction: null }));
       pendingActionRef.current = null;
       return null;
@@ -145,26 +200,117 @@ export const useGameEngine = ({
 
     const action = chooseAction(state);
     
-    // Store the pending action for execution
     pendingActionRef.current = {
       state,
       action,
       timestamp: Date.now()
     };
 
-    // Update agent state with next action (for UI display)
     setAgentState(prev => ({ ...prev, nextAction: action }));
 
     return action;
   }, [chooseAction, isTerminalState]);
 
-  /**
-   * Execute the pending action
-   */
+  // Generate episode key for duplicate detection
+  const generateEpisodeKey = useCallback((round: number, episode: number): string => {
+    return `${round}-${episode}`;
+  }, []);
+
+  // Handle episode completion
+  const handleEpisodeCompletion = useCallback((reward: number, cellType: string, newState: number) => {
+    // Determine if this is a successful episode (reached goal)
+    const success = cellType === 'G';
+    if (success) {
+      successCountRef.current++;
+    }
+
+    // Get current round and episode information
+    const currentRound = gameStatsRef.current.currentRound;
+    const completedEpisode = gameStatsRef.current.episode; // Episode that just finished
+    const isRoundEnd = completedEpisode >= roundConfigRef.current.episodesPerRound;
+    const nextEpisode = isRoundEnd ? 1 : completedEpisode + 1; // Next episode number
+
+    // Calculate success rate for the completed episode
+    const newSuccessRate = completedEpisode > 0 ? successCountRef.current / completedEpisode : 0;
+
+    // Prepare episode data for callback with correct episode number
+    const episodeDataForCallback = {
+      episode: completedEpisode, // Use the episode that just finished
+      totalReward: gameStatsRef.current.totalReward + episodeStatsRef.current.episodeReward,
+      steps: gameStatsRef.current.steps + episodeStatsRef.current.episodeSteps,
+      lastReward: reward,
+      interventions: gameStatsRef.current.interventions + episodeStatsRef.current.episodeInterventions,
+      successRate: newSuccessRate,
+      currentRound: currentRound
+    };
+
+    // Check if this episode has already been processed to avoid duplicates
+    const episodeKey = generateEpisodeKey(currentRound, completedEpisode);
+    if (currentEpisodeKeyRef.current !== episodeKey) {
+      // Notify parent component about episode completion with correct episode number
+      onEpisodeEnd?.(episodeDataForCallback);
+      currentEpisodeKeyRef.current = episodeKey;
+    }
+
+    // Update game statistics with next episode number
+    setGameStats({
+      episode: nextEpisode, // Set to next episode number
+      totalReward: gameStatsRef.current.totalReward + episodeStatsRef.current.episodeReward,
+      steps: gameStatsRef.current.steps + episodeStatsRef.current.episodeSteps,
+      lastReward: reward,
+      interventions: gameStatsRef.current.interventions + episodeStatsRef.current.episodeInterventions,
+      successRate: newSuccessRate,
+      currentRound: currentRound
+    });
+
+    const currentGameStatus = gameStatusRef.current;
+    
+    if (isRoundEnd) {
+      // Handle round completion
+      if (currentGameStatus.isRunning) {
+        setGameStatus(prev => ({
+          ...prev,
+          isRunning: false,
+          isPaused: false
+        }));
+      }
+
+      // Notify parent about round completion after delay
+      setTimeout(() => {
+        onRoundEnd?.(currentRound);
+      }, 150);
+    } else if (currentGameStatus.isRunning && !currentGameStatus.isPaused) {
+      // Prepare for next episode in the same round
+      setTimeout(() => {
+        // Reset agent state for new episode
+        setAgentState({
+          currentState: startState, 
+          totalReward: 0,
+          steps: 0,
+          lastReward: 0,
+          isDone: false,
+          nextAction: null
+        });
+        
+        // Reset episode-specific statistics
+        episodeStatsRef.current = {
+          episodeReward: 0,
+          episodeSteps: 0,
+          episodeInterventions: 0
+        };
+        
+        // Select first action for new episode
+        selectNextAction(startState);
+      }, 1000);
+    }
+  }, [onEpisodeEnd, onRoundEnd, startState, selectNextAction, generateEpisodeKey]);
+
+  // Execute the pending action and update environment
   const executePendingAction = useCallback(() => {
     const pendingAction = pendingActionRef.current;
     const currentAgentState = agentStateRef.current;
     
+    // Validate pending action
     if (!pendingAction || 
         pendingAction.state !== currentAgentState.currentState ||
         currentAgentState.isDone) {
@@ -179,16 +325,16 @@ export const useGameEngine = ({
 
     // Calculate new state based on action
     switch (action) {
-      case 0: // Left
+      case 0:
         if (currentState % ncol > 0) newState = currentState - 1;
         break;
-      case 1: // Down
+      case 1:
         if (Math.floor(currentState / ncol) < nrow - 1) newState = currentState + ncol;
         break;
-      case 2: // Right
+      case 2:
         if (currentState % ncol < ncol - 1) newState = currentState + 1;
         break;
-      case 3: // Up
+      case 3:
         if (Math.floor(currentState / ncol) > 0) newState = currentState - ncol;
         break;
     }
@@ -200,11 +346,15 @@ export const useGameEngine = ({
     const reward = calculateReward(newState);
     const isDone = isTerminalState(newState);
     
-    // Update Q-value using the action that was executed
+    // Update Q-table with experience
     if (updateQValue) {
       updateQValue(currentState, action, reward, newState);
     }
     
+    // Mark action vaild
+    if (markActionAsExecuted) {
+      markActionAsExecuted(currentState); 
+    }
     // Update agent state
     setAgentState(prev => ({
       currentState: newState,
@@ -212,69 +362,31 @@ export const useGameEngine = ({
       steps: prev.steps + 1,
       lastReward: reward,
       isDone,
-      nextAction: null // Clear next action since we just executed it
+      nextAction: null
     }));
 
     // Update episode statistics
     episodeStatsRef.current.episodeReward += reward;
     episodeStatsRef.current.episodeSteps += 1;
 
-    // Callback
+    // Notify parent component about step
     onStep?.(currentState, action, reward, newState);
 
-    // Clear pending action
     pendingActionRef.current = null;
 
-    // Check episode end
+    // Handle terminal state (episode end)
     if (isDone) {
+      console.log('=== Terminal State Reached ===');
+    console.log('Steps to terminal:', agentStateRef.current?.steps);
+    console.log('Reward:', reward);
+    console.log('Episode stats before update:', episodeStatsRef.current);
       const { row, col } = getAgentPosition(newState);
       const cellType = config.mapDesc[row][col];
-      const success = cellType === 'G';
       
-      if (success) {
-        successCountRef.current++;
-      }
-
-      const totalEpisodes = gameStatsRef.current.episode + 1;
-      const newSuccessRate = successCountRef.current / totalEpisodes;
-
-      setGameStats(prev => {
-        const newStats = {
-          episode: totalEpisodes,
-          totalReward: prev.totalReward + episodeStatsRef.current.episodeReward,
-          steps: prev.steps + episodeStatsRef.current.episodeSteps,
-          lastReward: reward,
-          interventions: prev.interventions + episodeStatsRef.current.episodeInterventions,
-          successRate: newSuccessRate
-        };
-        
-        onEpisodeEnd?.(newStats);
-        return newStats;
-      });
-
-      // Auto reset for next episode
-      const currentGameStatus = gameStatusRef.current;
-      if (currentGameStatus.isRunning && !currentGameStatus.isPaused) { 
-        setTimeout(() => {
-          setAgentState({
-            currentState: startState, 
-            totalReward: 0,
-            steps: 0,
-            lastReward: 0,
-            isDone: false,
-            nextAction: null
-          });
-          episodeStatsRef.current = {
-            episodeReward: 0,
-            episodeSteps: 0,
-            episodeInterventions: 0
-          };
-          // Select first action for new episode
-          selectNextAction(startState);
-        }, 1000);
-      }
+      // Handle episode completion
+      handleEpisodeCompletion(reward, cellType, newState);
     } else {
-      // Select next action for the new state (creates new announcement)
+      // Continue episode with next action
       setTimeout(() => {
         selectNextAction(newState);
       }, 0);
@@ -285,23 +397,24 @@ export const useGameEngine = ({
     isTerminalState, 
     updateQValue, 
     onStep, 
-    onEpisodeEnd, 
     getAgentPosition, 
-    startState,
+    handleEpisodeCompletion,
     selectNextAction
   ]);
 
-  // ==================== Game Control Functions ====================
+  // Start dragging agent (pauses game)
   const startDrag = useCallback(() => {
     setIsDragging(true);
     setGameStatus(prev => ({ ...prev, isPaused: true }));
   }, []);
 
+  // End dragging agent (resumes game)
   const endDrag = useCallback(() => {
     setIsDragging(false);
     setGameStatus(prev => ({ ...prev, isPaused: false }));
   }, []);
 
+  // Start game/training
   const startGame = useCallback(() => {
     setGameStatus(prev => ({
       ...prev,
@@ -309,12 +422,13 @@ export const useGameEngine = ({
       isPaused: false
     }));
     
-    // Select first action when game starts
+    // Select first action if agent is not in terminal state
     if (!agentState.isDone) {
       selectNextAction(agentState.currentState);
     }
   }, [agentState.isDone, agentState.currentState, selectNextAction]);
 
+  // Pause game
   const pauseGame = useCallback(() => {
     setGameStatus(prev => ({
       ...prev,
@@ -322,12 +436,15 @@ export const useGameEngine = ({
     }));
   }, []);
 
+  // Reset game to initial state
   const resetGame = useCallback(() => {
+    // Stop game loop
     if (gameLoopRef.current) {
       cancelAnimationFrame(gameLoopRef.current);
       gameLoopRef.current = null;
     }
 
+    // Reset agent state
     setAgentState({
       currentState: startState, 
       totalReward: 0,
@@ -337,6 +454,7 @@ export const useGameEngine = ({
       nextAction: null
     });
 
+    // Reset game status
     setGameStatus({
       isRunning: false,
       isPaused: false,
@@ -344,23 +462,40 @@ export const useGameEngine = ({
       isTraining: true
     });
 
+    // Reset game statistics
+    setGameStats(prev => ({
+      episode: 1,
+      totalReward: 0,
+      steps: 0,
+      lastReward: 0,
+      interventions: 0,
+      successRate: 0,
+      currentRound: prev.currentRound
+    }));
+
+    // Reset episode statistics
     episodeStatsRef.current = {
       episodeReward: 0,
       episodeSteps: 0,
       episodeInterventions: 0
     };
 
+    // Reset tracking refs
     successCountRef.current = 0;
     lastStepTimeRef.current = 0;
     pendingActionRef.current = null;
-  }, [startState]);
+    currentEpisodeKeyRef.current = '';
 
-  // ==================== Step Function (for manual stepping) ====================
+    // Reset Q-table
+    resetQTable?.();
+  }, [startState, resetQTable]);
+
+  // Execute single step (for manual control)
   const stepGame = useCallback(() => {
     executePendingAction();
   }, [executePendingAction]);
 
-  // ==================== Intervention Handler ====================
+  // Manual agent state change (for interventions)
   const setAgentStateManually = useCallback((newState: number) => {
     if (gameStatus.isIntervening) return;
 
@@ -370,19 +505,18 @@ export const useGameEngine = ({
 
     setGameStatus(prev => ({ ...prev, isIntervening: true }));
 
-    // Get the pending action for intervention
+    // Get pending action for intervention recording
     const pendingAction = pendingActionRef.current;
     const interventionAction = pendingAction?.action;
     
-    // Apply intervention using the pending action
+    // Apply intervention effect to Q-table
     if (applyIntervention && interventionAction !== undefined) {
       applyIntervention(oldState, newState, reward);
     }
 
-    // Clear pending action since we're intervening
     pendingActionRef.current = null;
 
-    // Update agent state
+    // Update agent state with intervention
     setAgentState(prev => {
       const { row, col } = getAgentPosition(newState);
       const cellType = config.mapDesc[row][col];
@@ -405,18 +539,19 @@ export const useGameEngine = ({
       };
     });
 
-    // Update episode statistics
     const { row, col } = getAgentPosition(newState);
     const cellType = config.mapDesc[row][col];
     
+    // Update episode statistics
     if (cellType !== 'H') {
       episodeStatsRef.current.episodeReward += reward;
     }
     episodeStatsRef.current.episodeInterventions += 1;
 
+    // Notify parent about intervention
     onIntervention?.(oldState, newState);
 
-    // Handle terminal state from intervention
+    // Handle terminal state after intervention
     if (isDone) {
       const success = cellType === 'G';
       
@@ -424,32 +559,46 @@ export const useGameEngine = ({
         successCountRef.current++;
       }
 
-      const totalEpisodes = gameStats.episode + 1;
-      const newSuccessRate = totalEpisodes > 0 ? successCountRef.current / totalEpisodes : 0;
+      const currentRound = gameStats.currentRound;
+      const currentEpisode = gameStats.episode;
+      const episodeKey = generateEpisodeKey(currentRound, currentEpisode);
+      const newSuccessRate = currentEpisode > 0 ? successCountRef.current / currentEpisode : 0;
+      const isRoundEnd = currentEpisode >= roundConfigRef.current.episodesPerRound;
 
-      // Update global statistics
+      // Update statistics and trigger episode end
       setGameStats(prev => {
         const newStats = {
-          episode: totalEpisodes,
+          episode: prev.episode,
           totalReward: prev.totalReward + episodeStatsRef.current.episodeReward,
           steps: prev.steps + episodeStatsRef.current.episodeSteps,
           lastReward: reward,
           interventions: prev.interventions + episodeStatsRef.current.episodeInterventions,
-          successRate: newSuccessRate
+          successRate: newSuccessRate,
+          currentRound: prev.currentRound
         };
         
-        onEpisodeEnd?.(newStats);
+        // Check if this episode has already been processed
+        if (currentEpisodeKeyRef.current !== episodeKey) {
+          onEpisodeEnd?.(newStats);
+          currentEpisodeKeyRef.current = episodeKey;
+        }
+
         return newStats;
       });
 
-      // Auto pause and reset
-      if (gameStatus.isRunning) {
+      if (isRoundEnd && gameStatus.isRunning) {
         setGameStatus(prev => ({
           ...prev,
-          isRunning: false, 
+          isRunning: false,
           isPaused: true
         }));
 
+        // Notify round end
+        setTimeout(() => {
+          onRoundEnd?.(gameStats.currentRound);
+        }, 100);
+      } else if (gameStatus.isRunning) {
+        // Start new episode after delay
         setTimeout(() => {
           setAgentState({
             currentState: startState, 
@@ -459,28 +608,23 @@ export const useGameEngine = ({
             isDone: false,
             nextAction: null
           });
+          
+          setGameStats(prev => ({
+            ...prev,
+            episode: prev.episode + 1
+          }));
+          
           episodeStatsRef.current = {
             episodeReward: 0,
             episodeSteps: 0,
             episodeInterventions: 0
           };
           
-          // Auto restart if training
-          setTimeout(() => {
-            if (gameStatusRef.current.isTraining) {
-              setGameStatus(prev => ({
-                ...prev,
-                isRunning: true,
-                isPaused: false
-              }));
-              // Select first action
-              selectNextAction(startState);
-            }
-          }, 500);
+          selectNextAction(startState);
         }, 1500);
       }
     } else {
-      // Select next action for the new state after intervention
+      // Continue with next action
       setTimeout(() => {
         selectNextAction(newState);
       }, 100);
@@ -494,7 +638,6 @@ export const useGameEngine = ({
     agentState.currentState, 
     gameStatus.isIntervening, 
     gameStatus.isRunning, 
-    gameStatus.isTraining,
     calculateReward, 
     isTerminalState, 
     applyIntervention, 
@@ -502,16 +645,51 @@ export const useGameEngine = ({
     onEpisodeEnd,
     getAgentPosition, 
     config.mapDesc, 
-    gameStats.episode, 
+    gameStats.currentRound,
+    gameStats.episode,
     startState,
-    selectNextAction
+    selectNextAction,
+    onRoundEnd,
+    roundConfigRef,
+    generateEpisodeKey
   ]);
 
-  // ==================== Game Main Loop ====================
+  // Update round configuration
+  const setRoundConfig = useCallback((config: { totalRounds?: number; episodesPerRound?: number }) => {
+    if (config.totalRounds !== undefined) {
+      roundConfigRef.current.totalRounds = config.totalRounds;
+    }
+    if (config.episodesPerRound !== undefined) {
+      roundConfigRef.current.episodesPerRound = config.episodesPerRound;
+    }
+  }, []);
+
+  // Sync refs with state
+  useEffect(() => {
+    agentStateRef.current = agentState;
+  }, [agentState]);
+
+  useEffect(() => {
+    gameStatusRef.current = gameStatus;
+  }, [gameStatus]);
+
+  useEffect(() => {
+    gameStatsRef.current = gameStats;
+  }, [gameStats]);
+
+  // // Select next action when game starts or resumes
+  // useEffect(() => {
+  //   if (gameStatus.isRunning && !gameStatus.isPaused && !agentState.isDone) {
+  //     selectNextAction(agentState.currentState);
+  //   }
+  // }, [gameStatus.isRunning, gameStatus.isPaused, agentState.isDone, selectNextAction]);
+
+  // Main game loop for automatic step execution
   useEffect(() => {
     const gameLoop = (currentTime: number) => {
       const currentGameStatus = gameStatusRef.current; 
       
+      // Skip if game is not active
       if (!currentGameStatus.isRunning || 
           currentGameStatus.isPaused || 
           currentGameStatus.isIntervening || 
@@ -520,7 +698,7 @@ export const useGameEngine = ({
         return;
       }
 
-      // Execute pending action after the delay
+      // Execute action at configured interval
       if (currentTime - lastStepTimeRef.current >= config.agentStepDelay) {
         executePendingAction();
         lastStepTimeRef.current = currentTime;
@@ -541,7 +719,6 @@ export const useGameEngine = ({
     };
   }, [gameStatus.isRunning, gameStatus.isPaused, gameStatus.isIntervening, isDragging, config.agentStepDelay, executePendingAction]);
 
-  // ==================== Return Interface ====================
   return {
     agentState,
     gameStatus,
@@ -558,6 +735,9 @@ export const useGameEngine = ({
     isDragging,
     startDrag,
     endDrag,
-    selectNextAction, // Export for testing/debugging
+    selectNextAction,
+    prepareNewRound,
+    setRoundConfig,
+    getRoundConfig: () => roundConfigRef.current,
   };
 };

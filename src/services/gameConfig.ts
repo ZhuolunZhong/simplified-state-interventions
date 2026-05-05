@@ -7,7 +7,7 @@ import { GameConfig, MapDesc, InterventionRule } from '../types';
 // Predefined map configurations
 export const MAP_CONFIGS = {
   // 1x16 linear map (used in Python version)
-  LINEAR_1x16: ['HFSFFFFFFFFFFG'] as MapDesc,
+  LINEAR_1x16: ['HFSFFFFFFFFG'] as MapDesc,
   
   // 4x4 standard Frozen Lake map
   STANDARD_4x4: [
@@ -33,7 +33,7 @@ export const MAP_CONFIGS = {
 // Reward scheme configurations
 export const REWARD_SCHEDULES = {
   DEFAULT: [-10, 10, 0] as [number, number, number], // [hole, goal, frozen]
-  GENEROUS: [-5, 20, 0] as [number, number, number],
+  GENEROUS: [5, 10, 0] as [number, number, number],
   HARSH: [-20, 5, -1] as [number, number, number],
 } as const;
 
@@ -41,7 +41,7 @@ export const DEFAULT_INTERVENTION_RULE: InterventionRule = 'suggestion';
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   mapDesc: MAP_CONFIGS.STANDARD_4x4,
-  rewardSchedule: REWARD_SCHEDULES.DEFAULT,
+  rewardSchedule: REWARD_SCHEDULES.GENEROUS,
   isSlippery: false,
   agentStepDelay: 500
 };
