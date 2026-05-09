@@ -129,6 +129,141 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
   const agentStateRef = useRef<AgentState | null>(null);
   const isProcessingEpisodeRef = useRef(false);
 
+  // // Handle experiment end
+  // const handleExperimentEnd = useCallback(async (totalEpisodes: number) => {
+  //   if (!gameStatsRef.current) {
+  //     return;
+  //   }
+
+  //   const finalRoundEpisodes = [...roundEpisodeDataRef.current];
+  //   const finalRoundInterventions = [...roundInterventionsRef.current];
+    
+  //   if (finalRoundEpisodes.length < roundConfig.episodesPerRound) {
+  //     const recordedEpisodes = finalRoundEpisodes.map(ep => ep.episodeInRound);
+  //     for (let i = 1; i <= roundConfig.episodesPerRound; i++) {
+  //       if (!recordedEpisodes.includes(i)) {
+  //         finalRoundEpisodes.push({
+  //           round: currentRoundRef.current,
+  //           episodeInRound: i,
+  //           reward: 0,
+  //           steps: 0
+  //         });
+  //       }
+  //     }
+  //     finalRoundEpisodes.sort((a, b) => a.episodeInRound - b.episodeInRound);
+  //   }
+    
+  //   if (finalRoundEpisodes.length > 0) {
+  //     setEpisodeData(prev => [...prev, ...finalRoundEpisodes]);
+  //   }
+    
+  //   if (finalRoundInterventions.length > 0) {
+  //     setAllInterventions(prev => [...prev, ...finalRoundInterventions]);
+  //   }
+    
+  //   const finalRoundQTable: RoundQTable = {
+  //     round: currentRoundRef.current,
+  //     qtable: qtable.map(row => [...row])
+  //   };
+    
+  //   const finalRoundSaved = roundQTables.some(rq => rq.round === currentRoundRef.current);
+  //   if (!finalRoundSaved) {
+  //     setRoundQTables(prev => [...prev, finalRoundQTable]);
+  //   }
+    
+  //   const finalTrainingTime = trainingStartTime ? 
+  //     Math.floor((Date.now() - trainingStartTime) / 1000) : trainingTime;
+
+  //   const exportData = exportExperimentData(
+  //     roundQTables,
+  //     gameStatsRef.current,
+  //     episodeData,
+  //     allInterventions,
+  //     learningParams,
+  //     gameConfig,
+  //     assignedRule,
+  //     finalTrainingTime,
+  //     roundConfig,
+  //     surveyResponsesRef.current
+  //   );
+
+  //   try {
+  //     let saveResult = null;
+      
+  //     if (backendStatus.connected) {
+  //       try {
+  //         saveResult = await ApiService.saveExperiment(exportData);
+  //       } catch (saveError) {
+  //         console.warn('Database save failed:', saveError);
+  //       }
+  //     }
+
+  //     const enhancedData = {
+  //       ...exportData,
+  //       backendInfo: {
+  //         savedToDatabase: saveResult?.success || false,
+  //         experimentId: saveResult?.experimentId || null,
+  //         backendConnected: backendStatus.connected
+  //       }
+  //     };
+
+  //     onPhaseChange('results', enhancedData);
+
+  //   } catch (error) {
+  //     console.error('Error processing experiment data:', error);
+  //     onPhaseChange('results', exportData);
+  //   }
+  // }, [
+  //   qtable,
+  //   roundQTables,
+  //   episodeData,
+  //   allInterventions,
+  //   learningParams,
+  //   gameConfig,
+  //   assignedRule,
+  //   trainingStartTime,
+  //   trainingTime,
+  //   roundConfig,
+  //   backendStatus.connected,
+  //   onPhaseChange
+  // ]);
+
+  // Helper function to download CSV
+  const downloadCSV = (data: any[], filename: string) => {
+    if (!data || data.length === 0) {
+      console.warn(`No data for ${filename}`);
+      return;
+    }
+
+    const headers = Object.keys(data[0]);
+    const csvRows = [
+      headers.join(','),
+      ...data.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          // Handle strings with commas or quotes
+          if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+            return `"${value.replace(/"/g, '""')}"`;
+          }
+          return value;
+        }).join(',')
+      )
+    ];
+    
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // Handle experiment end
   const handleExperimentEnd = useCallback(async (totalEpisodes: number) => {
     if (!gameStatsRef.current) {
@@ -187,32 +322,80 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
       surveyResponsesRef.current
     );
 
-    try {
-      let saveResult = null;
-      
-      if (backendStatus.connected) {
-        try {
-          saveResult = await ApiService.saveExperiment(exportData);
-        } catch (saveError) {
-          console.warn('Database save failed:', saveError);
-        }
-      }
-
-      const enhancedData = {
-        ...exportData,
-        backendInfo: {
-          savedToDatabase: saveResult?.success || false,
-          experimentId: saveResult?.experimentId || null,
-          backendConnected: backendStatus.connected
-        }
-      };
-
-      onPhaseChange('results', enhancedData);
-
-    } catch (error) {
-      console.error('Error processing experiment data:', error);
-      onPhaseChange('results', exportData);
+    // Prepare CSV files
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const userId = sessionStorage.getItem('user_id') || 'unknown';
+    
+    // 1. Episode data CSV
+    if (exportData.results.episodeData.length > 0) {
+      downloadCSV(exportData.results.episodeData, `episode_data_${userId}_${timestamp}.csv`);
     }
+    
+    // 2. Intervention history CSV
+    if (exportData.interventionSummary.recentInterventions.length > 0) {
+      downloadCSV(exportData.interventionSummary.recentInterventions, `interventions_${userId}_${timestamp}.csv`);
+    }
+    
+    // 3. Round statistics CSV
+    const roundStatsData = Object.entries(exportData.results.roundStats).map(([round, stats]) => ({
+      round: parseInt(round),
+      episodes: stats.episodes,
+      totalReward: stats.totalReward,
+      totalSteps: stats.totalSteps,
+      averageReward: stats.averageReward,
+      averageSteps: stats.averageSteps
+    }));
+    if (roundStatsData.length > 0) {
+      downloadCSV(roundStatsData, `round_stats_${userId}_${timestamp}.csv`);
+    }
+    
+    // 4. Survey responses CSV
+    if (exportData.surveyData.length > 0) {
+      downloadCSV(exportData.surveyData, `survey_responses_${userId}_${timestamp}.csv`);
+    }
+    
+    // 5. Q-tables (special format - each round as separate file)
+    if (exportData.results.roundQTables.length > 0) {
+      exportData.results.roundQTables.forEach((roundQTable: RoundQTable) => {
+        const qtableData = roundQTable.qtable.map((row: number[], stateIndex: number) => ({
+          round: roundQTable.round,
+          state: stateIndex,
+          action_0: row[0] || 0,
+          action_1: row[1] || 0,
+          action_2: row[2] || 0,
+          action_3: row[3] || 0
+        }));
+        downloadCSV(qtableData, `qtable_round${roundQTable.round}_${userId}_${timestamp}.csv`);
+      });
+    }
+    
+    // 6. Experiment metadata CSV
+    const metadata = {
+      experiment_id: exportData.metadata.exportTimestamp,
+      user_id: userId,
+      intervention_rule: exportData.experimentConfig.interventionRule,
+      total_rounds: exportData.experimentConfig.totalRounds || roundConfig.totalRounds,
+      episodes_per_round: exportData.experimentConfig.episodesPerRound || roundConfig.episodesPerRound,
+      total_episodes: exportData.experimentConfig.totalEpisodes,
+      training_time_seconds: exportData.results.trainingTime,
+      total_interventions: exportData.interventionSummary.totalCount,
+      average_success_rate: exportData.results.trainingStats.successRate,
+      export_timestamp: new Date().toISOString()
+    };
+    downloadCSV([metadata], `experiment_metadata_${userId}_${timestamp}.csv`);
+
+    // Create enhanced data for results page (without backend info)
+    const enhancedData = {
+      ...exportData,
+      backendInfo: {
+        savedToDatabase: false,
+        experimentId: null,
+        backendConnected: false
+      }
+    };
+
+    onPhaseChange('results', enhancedData);
+
   }, [
     qtable,
     roundQTables,
@@ -224,7 +407,6 @@ export const TrainingPage: React.FC<TrainingPageProps> = ({ onPhaseChange }) => 
     trainingStartTime,
     trainingTime,
     roundConfig,
-    backendStatus.connected,
     onPhaseChange
   ]);
 
